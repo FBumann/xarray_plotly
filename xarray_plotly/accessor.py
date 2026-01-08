@@ -25,10 +25,10 @@ class DataArrayPlotlyAccessor:
     >>> import xarray as xr
     >>> import numpy as np
     >>> da = xr.DataArray(np.random.rand(10, 3), dims=["time", "city"])
-    >>> fig = da.pxplot.line()  # Auto-assign dims: time->x, city->color
+    >>> fig = da.plotly.line()  # Auto-assign dims: time->x, city->color
     >>> fig.show()
 
-    >>> fig = da.pxplot.line(x="time", color=None)  # Explicit assignment
+    >>> fig = da.plotly.line(x="time", color=None)  # Explicit assignment
     >>> fig.update_layout(title="My Plot")
     """
 

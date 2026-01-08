@@ -1,8 +1,8 @@
-# xarray-plotly
+# xarray_plotly
 
 **Interactive Plotly Express plotting accessor for xarray**
 
-xarray-plotly provides a `pxplot` accessor for xarray DataArray objects that enables interactive plotting using Plotly Express. It automatically assigns dimensions to plot slots based on their order, making it easy to create rich, interactive visualizations with minimal code.
+xarray_plotly provides a `plotly` accessor for xarray DataArray objects that enables interactive plotting using Plotly Express. It automatically assigns dimensions to plot slots based on their order, making it easy to create rich, interactive visualizations with minimal code.
 
 ## Features
 
@@ -33,7 +33,7 @@ da = xr.DataArray(
 
 # Create an interactive line plot
 # Dimensions auto-assign: time->x, city->color, scenario->facet_col
-fig = da.pxplot.line()
+fig = da.plotly.line()
 fig.show()
 
 # Easy customization
@@ -46,16 +46,16 @@ fig.update_layout(
 ## Installation
 
 ```bash
-pip install xarray-plotly
+pip install xarray_plotly
 ```
 
 Or with uv:
 
 ```bash
-uv add xarray-plotly
+uv add xarray_plotly
 ```
 
-## Why xarray-plotly?
+## Why xarray_plotly?
 
 The current `.plot` accessor in xarray is built on matplotlib, which has limitations for modern data exploration:
 
@@ -63,7 +63,7 @@ The current `.plot` accessor in xarray is built on matplotlib, which has limitat
 2. **Post-creation modification is cumbersome**: Requires understanding complex object hierarchies
 3. **Multi-dimensional data**: No built-in support for faceting or animation
 
-xarray-plotly solves these with Plotly Express, providing:
+xarray_plotly solves these with Plotly Express, providing:
 
 - Interactive plots with zero additional code
 - Simple, predictable dimension-to-slot assignment

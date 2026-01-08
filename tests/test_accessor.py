@@ -12,7 +12,7 @@ import xarray_plotly  # noqa: F401 - registers accessor
 
 
 class TestDataArrayPxplot:
-    """Tests for DataArray.pxplot accessor."""
+    """Tests for DataArray.plotly accessor."""
 
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
@@ -45,60 +45,60 @@ class TestDataArrayPxplot:
         self.da_unnamed = xr.DataArray(np.random.rand(5, 3), dims=["x", "y"])
 
     def test_accessor_exists(self) -> None:
-        """Test that pxplot accessor is available on DataArray."""
-        assert hasattr(self.da_2d, "pxplot")
-        assert hasattr(self.da_2d.pxplot, "line")
-        assert hasattr(self.da_2d.pxplot, "bar")
-        assert hasattr(self.da_2d.pxplot, "area")
-        assert hasattr(self.da_2d.pxplot, "scatter")
-        assert hasattr(self.da_2d.pxplot, "box")
-        assert hasattr(self.da_2d.pxplot, "imshow")
+        """Test that plotly accessor is available on DataArray."""
+        assert hasattr(self.da_2d, "plotly")
+        assert hasattr(self.da_2d.plotly, "line")
+        assert hasattr(self.da_2d.plotly, "bar")
+        assert hasattr(self.da_2d.plotly, "area")
+        assert hasattr(self.da_2d.plotly, "scatter")
+        assert hasattr(self.da_2d.plotly, "box")
+        assert hasattr(self.da_2d.plotly, "imshow")
 
     def test_line_returns_figure(self) -> None:
         """Test that line() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.line()
+        fig = self.da_2d.plotly.line()
         assert isinstance(fig, go.Figure)
 
     def test_line_1d(self) -> None:
         """Test line plot with 1D data."""
-        fig = self.da_1d.pxplot.line()
+        fig = self.da_1d.plotly.line()
         assert isinstance(fig, go.Figure)
         assert len(fig.data) >= 1
 
     def test_line_2d(self) -> None:
         """Test line plot with 2D data."""
-        fig = self.da_2d.pxplot.line()
+        fig = self.da_2d.plotly.line()
         assert isinstance(fig, go.Figure)
         assert len(fig.data) >= 1
 
     def test_line_explicit_assignment(self) -> None:
         """Test line plot with explicit dimension assignment."""
-        fig = self.da_2d.pxplot.line(x="time", color="city")
+        fig = self.da_2d.plotly.line(x="time", color="city")
         assert isinstance(fig, go.Figure)
 
     def test_line_skip_slot(self) -> None:
         """Test line plot with skipped slot."""
-        fig = self.da_3d.pxplot.line(color=None)
+        fig = self.da_3d.plotly.line(color=None)
         assert isinstance(fig, go.Figure)
 
     def test_line_px_kwargs(self) -> None:
         """Test that px_kwargs are passed through."""
-        fig = self.da_2d.pxplot.line(title="My Plot")
+        fig = self.da_2d.plotly.line(title="My Plot")
         assert fig.layout.title.text == "My Plot"
 
     def test_bar_returns_figure(self) -> None:
         """Test that bar() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.bar()
+        fig = self.da_2d.plotly.bar()
         assert isinstance(fig, go.Figure)
 
     def test_area_returns_figure(self) -> None:
         """Test that area() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.area()
+        fig = self.da_2d.plotly.area()
         assert isinstance(fig, go.Figure)
 
     def test_scatter_returns_figure(self) -> None:
         """Test that scatter() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.scatter()
+        fig = self.da_2d.plotly.scatter()
         assert isinstance(fig, go.Figure)
 
     def test_scatter_dim_vs_dim(self) -> None:
@@ -109,22 +109,22 @@ class TestDataArrayPxplot:
             coords={"lat": np.arange(5), "lon": np.arange(10)},
             name="temperature",
         )
-        fig = da.pxplot.scatter(x="lon", y="lat", color="value")
+        fig = da.plotly.scatter(x="lon", y="lat", color="value")
         assert isinstance(fig, go.Figure)
 
     def test_box_returns_figure(self) -> None:
         """Test that box() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.box()
+        fig = self.da_2d.plotly.box()
         assert isinstance(fig, go.Figure)
 
     def test_box_with_aggregation(self) -> None:
         """Test box plot with unassigned dimensions aggregated."""
-        fig = self.da_2d.pxplot.box(x="city", color=None)
+        fig = self.da_2d.plotly.box(x="city", color=None)
         assert isinstance(fig, go.Figure)
 
     def test_imshow_returns_figure(self) -> None:
         """Test that imshow() returns a Plotly Figure."""
-        fig = self.da_2d.pxplot.imshow()
+        fig = self.da_2d.plotly.imshow()
         assert isinstance(fig, go.Figure)
 
     def test_imshow_transpose(self) -> None:
@@ -134,22 +134,22 @@ class TestDataArrayPxplot:
             dims=["lat", "lon"],
             coords={"lat": np.arange(10), "lon": np.arange(20)},
         )
-        fig = da.pxplot.imshow()
+        fig = da.plotly.imshow()
         assert isinstance(fig, go.Figure)
 
-        fig = da.pxplot.imshow(x="lon", y="lat")
+        fig = da.plotly.imshow(x="lon", y="lat")
         assert isinstance(fig, go.Figure)
 
     def test_unnamed_dataarray(self) -> None:
         """Test plotting unnamed DataArray."""
-        fig = self.da_unnamed.pxplot.line()
+        fig = self.da_unnamed.plotly.line()
         assert isinstance(fig, go.Figure)
 
     def test_unassigned_dims_error(self) -> None:
         """Test that too many dimensions raises an error."""
         da_8d = xr.DataArray(np.random.rand(2, 2, 2, 2, 2, 2, 2, 2), dims=list("abcdefgh"))
         with pytest.raises(ValueError, match="Unassigned dimension"):
-            da_8d.pxplot.line()
+            da_8d.plotly.line()
 
 
 class TestLabelsAndMetadata:
@@ -178,5 +178,5 @@ class TestLabelsAndMetadata:
 
     def test_value_label_from_attrs(self) -> None:
         """Test that value labels are extracted from attributes."""
-        fig = self.da.pxplot.line()
+        fig = self.da.plotly.line()
         assert isinstance(fig, go.Figure)

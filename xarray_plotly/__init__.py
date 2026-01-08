@@ -1,7 +1,7 @@
 """
-xarray-plotly: Interactive Plotly Express plotting accessor for xarray.
+xarray_plotly: Interactive Plotly Express plotting accessor for xarray.
 
-This package provides a `pxplot` accessor for xarray DataArray objects that
+This package provides a `plotly` accessor for xarray DataArray objects that
 enables interactive plotting using Plotly Express.
 
 Examples
@@ -16,13 +16,13 @@ Examples
 ... )
 
 >>> # Auto-assignment: time->x, city->color, scenario->facet_col
->>> fig = da.pxplot.line()
+>>> fig = da.plotly.line()
 
 >>> # Explicit assignment
->>> fig = da.pxplot.line(x="time", color="scenario", facet_col="city")
+>>> fig = da.plotly.line(x="time", color="scenario", facet_col="city")
 
 >>> # Skip a slot
->>> fig = da.pxplot.line(color=None)  # time->x, city->facet_col, scenario->facet_row
+>>> fig = da.plotly.line(color=None)  # time->x, city->facet_col, scenario->facet_row
 """
 
 from xarray import register_dataarray_accessor
@@ -39,4 +39,4 @@ __all__ = [
 __version__ = "0.1.0"
 
 # Register the accessor
-register_dataarray_accessor("pxplot")(DataArrayPlotlyAccessor)
+register_dataarray_accessor("plotly")(DataArrayPlotlyAccessor)

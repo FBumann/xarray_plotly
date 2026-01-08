@@ -1,22 +1,22 @@
-# xarray-plotly
+# xarray_plotly
 
 **Interactive Plotly Express plotting accessor for xarray**
 
-[![PyPI version](https://badge.fury.io/py/xarray-plotly.svg)](https://badge.fury.io/py/xarray-plotly)
-[![Python](https://img.shields.io/pypi/pyversions/xarray-plotly.svg)](https://pypi.org/project/xarray-plotly/)
+[![PyPI version](https://badge.fury.io/py/xarray_plotly.svg)](https://badge.fury.io/py/xarray_plotly)
+[![Python](https://img.shields.io/pypi/pyversions/xarray_plotly.svg)](https://pypi.org/project/xarray_plotly/)
 
-xarray-plotly provides a `pxplot` accessor for xarray DataArray objects that enables interactive plotting using Plotly Express with automatic dimension-to-slot assignment.
+xarray_plotly provides a `plotly` accessor for xarray DataArray objects that enables interactive plotting using Plotly Express with automatic dimension-to-slot assignment.
 
 ## Installation
 
 ```bash
-pip install xarray-plotly
+pip install xarray_plotly
 ```
 
 Or with uv:
 
 ```bash
-uv add xarray-plotly
+uv add xarray_plotly
 ```
 
 ## Quick Start
@@ -40,7 +40,7 @@ da = xr.DataArray(
 
 # Create an interactive line plot
 # Dimensions auto-assign: time→x, city→color, scenario→facet_col
-fig = da.pxplot.line()
+fig = da.plotly.line()
 fig.show()
 
 # Easy customization
@@ -62,13 +62,13 @@ Dimensions are automatically assigned to plot "slots" based on their order:
 ```python
 # dims: (time, city, scenario)
 # auto-assigns: time→x, city→color, scenario→facet_col
-da.pxplot.line()
+da.plotly.line()
 
 # Override with explicit assignments
-da.pxplot.line(x="time", color="scenario", facet_col="city")
+da.plotly.line(x="time", color="scenario", facet_col="city")
 
 # Skip a slot with None
-da.pxplot.line(color=None)  # time→x, city→facet_col
+da.plotly.line(color=None)  # time→x, city→facet_col
 ```
 
 ## Available Methods
@@ -84,7 +84,7 @@ da.pxplot.line(color=None)  # time→x, city→facet_col
 
 ## Documentation
 
-Full documentation with examples: [https://felix.github.io/xarray-plotly](https://felix.github.io/xarray-plotly)
+Full documentation with examples: [https://felix.github.io/xarray_plotly](https://felix.github.io/xarray_plotly)
 
 ## License
 
