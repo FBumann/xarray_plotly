@@ -70,9 +70,11 @@ class TestAssignSlots:
         assert slots == {"y": "lon", "x": "lat"}
 
     def test_allow_unassigned(self) -> None:
-        """Test allowing unassigned dimensions."""
-        slots = assign_slots(["a", "b", "c"], "box", allow_unassigned=True, color=None)
-        assert slots == {"x": "a"}
+        """Test allowing unassigned dimensions with more dims than slots."""
+        # box has 5 slots, but we have 6 dims - allow_unassigned lets this work
+        slots = assign_slots(list("abcdef"), "box", allow_unassigned=True)
+        assert slots == {"x": "a", "color": "b", "facet_col": "c", "facet_row": "d", "animation_frame": "e"}
+        # 'f' is unassigned but no error is raised
 
 
 class TestSlotOrders:
