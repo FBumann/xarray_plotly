@@ -1,4 +1,4 @@
-# xarray-plotly
+# xarray-plotly-accessor
 Convenience plotting accessor for xarray
 
 ## Background: A PR to xarray which got rejected
