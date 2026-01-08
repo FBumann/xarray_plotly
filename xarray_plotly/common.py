@@ -7,7 +7,7 @@ shared utilities for converting xarray data to Plotly-compatible formats.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Sequence
@@ -167,7 +167,6 @@ def get_value_col(darray: DataArray) -> str:
 
 def to_dataframe(darray: DataArray) -> pd.DataFrame:
     """Convert a DataArray to a long-form DataFrame for Plotly Express."""
-    import pandas as pd
 
     if darray.name is None:
         darray = darray.rename("value")

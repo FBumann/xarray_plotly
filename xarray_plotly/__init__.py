@@ -31,8 +31,8 @@ from xarray_plotly.accessor import DataArrayPlotlyAccessor
 from xarray_plotly.common import SLOT_ORDERS, auto
 
 __all__ = [
-    "DataArrayPlotlyAccessor",
     "SLOT_ORDERS",
+    "DataArrayPlotlyAccessor",
     "auto",
 ]
 
