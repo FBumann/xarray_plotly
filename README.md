@@ -2,8 +2,8 @@
 
 **Interactive Plotly Express plotting for xarray**
 
-[![PyPI version](https://badge.fury.io/py/xarray_plotly.svg)](https://badge.fury.io/py/xarray_plotly)
-[![Python](https://img.shields.io/pypi/pyversions/xarray_plotly.svg)](https://pypi.org/project/xarray_plotly/)
+[![PyPI version](https://badge.fury.io/py/xarray-plotly.svg)](https://badge.fury.io/py/xarray-plotly)
+[![Python](https://img.shields.io/pypi/pyversions/xarray-plotly.svg)](https://pypi.org/project/xarray-plotly/)
 [![CI](https://github.com/FBumann/xarray_plotly/actions/workflows/ci.yml/badge.svg)](https://github.com/FBumann/xarray_plotly/actions)
 [![Docs](https://img.shields.io/badge/docs-fbumann.github.io-blue)](https://fbumann.github.io/xarray_plotly/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
