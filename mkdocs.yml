@@ -70,6 +70,6 @@ nav:
   - Examples:
       - Plot Types: examples/plot-types.ipynb
       - Dimensions & Facets: examples/dimensions.ipynb
-      - Figure Customization: examples/figure.ipynb
       - Plotly Express Options: examples/kwargs.ipynb
+      - Figure Customization: examples/figure.ipynb
   - API Reference: api.md
