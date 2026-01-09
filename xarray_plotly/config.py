@@ -101,8 +101,8 @@ def get_options() -> dict[str, Any]:
 
     Examples
     --------
-    >>> import xarray_plotly as xp
-    >>> xp.get_options()
+    >>> from xarray_plotly import config
+    >>> config.get_options()
     {'label_use_long_name': True, 'label_include_units': True, ...}
     """
     return _options.to_dict()
@@ -142,12 +142,12 @@ def set_options(
     --------
     Set globally:
 
-    >>> import xarray_plotly as xp
-    >>> xp.config.set_options(label_include_units=False)
+    >>> from xarray_plotly import config
+    >>> config.set_options(label_include_units=False)
 
     Use as context manager:
 
-    >>> with xp.config.set_options(label_include_units=False):
+    >>> with config.set_options(label_include_units=False):
     ...     fig = xpx(da).line()  # No units in labels
     >>> # Units are back after the context
     """
@@ -181,3 +181,23 @@ def set_options(
         _options.label_include_units = old_values["label_include_units"]
         _options.label_unit_format = old_values["label_unit_format"]
         _options.slot_orders = old_values["slot_orders"]
+
+
+def notebook(renderer: str = "notebook") -> None:
+    """
+    Configure Plotly for Jupyter notebook rendering.
+
+    Parameters
+    ----------
+    renderer : str, optional
+        The Plotly renderer to use. Default is "notebook".
+        Other options include "jupyterlab", "colab", "kaggle", etc.
+
+    Examples
+    --------
+    >>> from xarray_plotly import config
+    >>> config.notebook()  # Configure for Jupyter notebooks
+    """
+    import plotly.io as pio
+
+    pio.renderers.default = renderer

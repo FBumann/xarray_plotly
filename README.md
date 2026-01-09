@@ -105,13 +105,13 @@ xpx(da).line(color=None)  # time→x, city→facet_col
 Customize label extraction and slot assignment behavior:
 
 ```python
-import xarray_plotly as xp
+from xarray_plotly import config, xpx
 
 # View current options
-xp.config.get_options()
+config.get_options()
 
-# Set globally
-with xp.config.set_options(label_include_units=False):
+# Set globally (temporary)
+with config.set_options(label_include_units=False):
     fig = xpx(da).line()  # Labels won't include units
 ```
 
