@@ -7,6 +7,7 @@ from xarray import DataArray, Dataset
 
 from xarray_plotly import plotting
 from xarray_plotly.common import SlotValue, auto
+from xarray_plotly.config import _options
 
 
 class DataArrayPlotlyAccessor:
@@ -353,21 +354,20 @@ class DatasetPlotlyAccessor:
 
         When combining all variables, "variable" is placed at the position
         specified by config.dataset_variable_position (default 1, second position).
+        Supports Python-style negative indexing: -1 = last, -2 = second-to-last, etc.
         """
         if var is None:
-            from xarray_plotly.config import _options
-
             da = self._ds.to_array(dim="variable")
             pos = _options.dataset_variable_position
             # Move "variable" to configured position
             if len(da.dims) > 1 and pos != 0:
                 dims = list(da.dims)
                 dims.remove("variable")
-                # Handle negative indices and bounds
-                if pos < 0:
-                    dims.append("variable")
-                else:
-                    dims.insert(min(pos, len(dims)), "variable")
+                # Use Python-style indexing (handles negative indices correctly)
+                # Clamp to valid range: -1 -> last, -2 -> second-to-last, etc.
+                n = len(dims)
+                insert_pos = max(0, n + pos + 1) if pos < 0 else min(pos, n)
+                dims.insert(insert_pos, "variable")
                 da = da.transpose(*dims)
             return da
         return self._ds[var]
