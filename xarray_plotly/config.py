@@ -44,6 +44,7 @@ DEFAULT_SLOT_ORDERS: dict[str, tuple[str, ...]] = {
     ),
     "imshow": ("y", "x", "facet_col", "animation_frame"),
     "box": ("x", "color", "facet_col", "facet_row", "animation_frame"),
+    "pie": ("names", "facet_col", "facet_row"),
 }
 
 

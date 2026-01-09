@@ -33,7 +33,7 @@ class DataArrayPlotlyAccessor:
         ```
     """
 
-    __all__: ClassVar = ["line", "bar", "area", "scatter", "box", "imshow"]
+    __all__: ClassVar = ["line", "bar", "area", "scatter", "box", "imshow", "pie"]
 
     def __init__(self, darray: DataArray) -> None:
         self._da = darray
@@ -274,6 +274,38 @@ class DataArrayPlotlyAccessor:
             **px_kwargs,
         )
 
+    def pie(
+        self,
+        *,
+        names: SlotValue = auto,
+        color: SlotValue = None,
+        facet_col: SlotValue = auto,
+        facet_row: SlotValue = auto,
+        **px_kwargs: Any,
+    ) -> go.Figure:
+        """Create an interactive pie chart.
+
+        Slot order: names -> facet_col -> facet_row
+
+        Args:
+            names: Dimension for pie slice names/categories. Default: first dimension.
+            color: Dimension for color grouping. Default: None (uses names).
+            facet_col: Dimension for subplot columns. Default: second dimension.
+            facet_row: Dimension for subplot rows. Default: third dimension.
+            **px_kwargs: Additional arguments passed to `plotly.express.pie()`.
+
+        Returns:
+            Interactive Plotly Figure.
+        """
+        return plotting.pie(
+            self._da,
+            names=names,
+            color=color,
+            facet_col=facet_col,
+            facet_row=facet_row,
+            **px_kwargs,
+        )
+
 
 class DatasetPlotlyAccessor:
     """Plotly Express plotting accessor for xarray Dataset.
@@ -307,7 +339,7 @@ class DatasetPlotlyAccessor:
         ```
     """
 
-    __all__: ClassVar = ["line", "bar", "area", "scatter", "box"]
+    __all__: ClassVar = ["line", "bar", "area", "scatter", "box", "pie"]
 
     def __init__(self, dataset: Dataset) -> None:
         self._ds = dataset
@@ -517,5 +549,38 @@ class DatasetPlotlyAccessor:
             facet_col=facet_col,
             facet_row=facet_row,
             animation_frame=animation_frame,
+            **px_kwargs,
+        )
+
+    def pie(
+        self,
+        var: str | None = None,
+        *,
+        names: SlotValue = auto,
+        color: SlotValue = None,
+        facet_col: SlotValue = auto,
+        facet_row: SlotValue = auto,
+        **px_kwargs: Any,
+    ) -> go.Figure:
+        """Create an interactive pie chart.
+
+        Args:
+            var: Variable to plot. If None, plots all variables with "variable" dimension.
+            names: Dimension for pie slice names/categories.
+            color: Dimension for color grouping.
+            facet_col: Dimension for subplot columns.
+            facet_row: Dimension for subplot rows.
+            **px_kwargs: Additional arguments passed to `plotly.express.pie()`.
+
+        Returns:
+            Interactive Plotly Figure.
+        """
+        da = self._get_dataarray(var)
+        return plotting.pie(
+            da,
+            names=names,
+            color=color,
+            facet_col=facet_col,
+            facet_row=facet_row,
             **px_kwargs,
         )
