@@ -446,3 +446,64 @@ def imshow(
         animation_frame=slots.get("animation_frame"),
         **px_kwargs,
     )
+
+
+def pie(
+    darray: DataArray,
+    *,
+    names: SlotValue = auto,
+    color: SlotValue = None,
+    facet_col: SlotValue = auto,
+    facet_row: SlotValue = auto,
+    **px_kwargs: Any,
+) -> go.Figure:
+    """
+    Create an interactive pie chart from a DataArray.
+
+    The values are the DataArray values. Dimensions fill slots in order:
+    names -> facet_col -> facet_row
+
+    Parameters
+    ----------
+    darray
+        The DataArray to plot.
+    names
+        Dimension for pie slice names/categories. Default: first dimension.
+    color
+        Dimension for color grouping. Default: None (uses names).
+    facet_col
+        Dimension for subplot columns. Default: second dimension.
+    facet_row
+        Dimension for subplot rows. Default: third dimension.
+    **px_kwargs
+        Additional arguments passed to `plotly.express.pie()`.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    slots = assign_slots(
+        list(darray.dims),
+        "pie",
+        names=names,
+        facet_col=facet_col,
+        facet_row=facet_row,
+    )
+
+    df = to_dataframe(darray)
+    value_col = get_value_col(darray)
+    labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
+
+    # Use names dimension for color if not explicitly set
+    color_col = color if color is not None else slots.get("names")
+
+    return px.pie(
+        df,
+        names=slots.get("names"),
+        values=value_col,
+        color=color_col,
+        facet_col=slots.get("facet_col"),
+        facet_row=slots.get("facet_row"),
+        labels=labels,
+        **px_kwargs,
+    )
