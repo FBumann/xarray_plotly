@@ -57,6 +57,18 @@ with config.set_options(label_include_units=False):
     fig = xpx(da).line()
 ```
 
+For all other visual customization (themes, colors, default template, etc.),
+use Plotly's built-in configuration via `plotly.io`:
+
+```python
+import plotly.io as pio
+
+pio.templates.default = "plotly_white"
+pio.renderers.default = "notebook"
+```
+
+See [Plotly Templates](https://plotly.com/python/templates/) for available options.
+
 ::: xarray_plotly.config
     options:
       show_root_heading: true
