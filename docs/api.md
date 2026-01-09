@@ -42,6 +42,30 @@ The accessor style (`da.plotly.line()`) works but doesn't provide IDE code compl
         - box
         - imshow
 
+## Configuration
+
+Customize label extraction and slot assignment behavior:
+
+```python
+import xarray_plotly as xp
+
+# View current options
+xp.config.get_options()
+
+# Set options (works as context manager)
+with xp.config.set_options(label_include_units=False):
+    fig = xpx(da).line()
+```
+
+::: xarray_plotly.config
+    options:
+      show_root_heading: true
+      members:
+        - get_options
+        - set_options
+        - Options
+        - DEFAULT_SLOT_ORDERS
+
 ## Common Utilities
 
 ::: xarray_plotly.common
