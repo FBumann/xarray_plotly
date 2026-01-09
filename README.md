@@ -96,9 +96,34 @@ xpx(da).line(color=None)  # time→x, city→facet_col
 | `line()` | Line plot | x → color → line_dash → symbol → facet_col → facet_row → animation_frame |
 | `bar()` | Bar chart | x → color → pattern_shape → facet_col → facet_row → animation_frame |
 | `area()` | Stacked area | x → color → pattern_shape → facet_col → facet_row → animation_frame |
-| `scatter()` | Scatter plot | x → color → size → symbol → facet_col → facet_row → animation_frame |
+| `scatter()` | Scatter plot | x → color → symbol → facet_col → facet_row → animation_frame |
 | `box()` | Box plot | x → color → facet_col → facet_row → animation_frame |
 | `imshow()` | Heatmap | y → x → facet_col → animation_frame |
+
+## Configuration
+
+Customize label extraction and slot assignment behavior:
+
+```python
+import xarray_plotly as xp
+
+# View current options
+xp.config.get_options()
+
+# Set globally
+with xp.config.set_options(label_include_units=False):
+    fig = xpx(da).line()  # Labels won't include units
+```
+
+**Available options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `label_use_long_name` | `True` | Use `long_name` attr for labels |
+| `label_use_standard_name` | `True` | Fall back to `standard_name` |
+| `label_include_units` | `True` | Append units to labels |
+| `label_unit_format` | `"[{units}]"` | Format string for units |
+| `slot_orders` | (defaults) | Slot orders per plot type |
 
 ## Documentation
 

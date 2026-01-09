@@ -112,7 +112,6 @@ class TestSlotOrders:
         assert SLOT_ORDERS["scatter"] == (
             "x",
             "color",
-            "size",
             "symbol",
             "facet_col",
             "facet_row",
