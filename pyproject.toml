@@ -57,7 +57,7 @@ build-backend = "setuptools.build_meta"
 include = ["xarray_plotly*"]
 
 [tool.setuptools.package-data]
-"*" = []
+"xarray_plotly" = ["py.typed"]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
