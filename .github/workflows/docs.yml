@@ -1,7 +1,7 @@
 name: Docs
 
 on:
-  push:
+  pull_request:
     branches: [main]
   release:
     types: [published]
@@ -26,6 +26,7 @@ jobs:
         run: uv run mkdocs build
 
       - name: Deploy to GitHub Pages
+        if: github.event_name == 'release'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
