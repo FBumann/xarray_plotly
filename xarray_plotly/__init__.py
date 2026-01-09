@@ -29,6 +29,7 @@ from importlib.metadata import version
 
 from xarray import DataArray, register_dataarray_accessor
 
+from xarray_plotly import config
 from xarray_plotly.accessor import DataArrayPlotlyAccessor
 from xarray_plotly.common import SLOT_ORDERS, auto
 
@@ -36,6 +37,7 @@ __all__ = [
     "DataArrayPlotlyAccessor",
     "SLOT_ORDERS",
     "auto",
+    "config",
     "xpx",
 ]
 

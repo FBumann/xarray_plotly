@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from xarray_plotly.config import DEFAULT_SLOT_ORDERS, _options
+
 if TYPE_CHECKING:
     from collections.abc import Hashable, Sequence
 
@@ -30,40 +32,14 @@ auto = _AUTO()
 SlotValue = _AUTO | str | None
 """Type alias for slot values: auto, explicit dimension name, or None (skip)."""
 
-SLOT_ORDERS: dict[str, tuple[str, ...]] = {
-    "line": (
-        "x",
-        "color",
-        "line_dash",
-        "symbol",
-        "facet_col",
-        "facet_row",
-        "animation_frame",
-    ),
-    "bar": ("x", "color", "pattern_shape", "facet_col", "facet_row", "animation_frame"),
-    "area": (
-        "x",
-        "color",
-        "pattern_shape",
-        "facet_col",
-        "facet_row",
-        "animation_frame",
-    ),
-    "scatter": (
-        "x",
-        "color",
-        "symbol",
-        "facet_col",
-        "facet_row",
-        "animation_frame",
-    ),
-    "imshow": ("y", "x", "facet_col", "animation_frame"),
-    "box": ("x", "color", "facet_col", "facet_row", "animation_frame"),
-}
+# Re-export for backward compatibility
+SLOT_ORDERS = DEFAULT_SLOT_ORDERS
 """Slot orders per plot type.
 
 For most plots, y-axis shows DataArray values (not a dimension slot).
 For imshow, both y and x are dimensions (rows and columns of the heatmap).
+
+Note: To customize slot orders, use `set_options(slot_orders=...)`.
 """
 
 
@@ -106,11 +82,12 @@ def assign_slots(
         If plot_type is unknown, a dimension doesn't exist, or dimensions
         are left unassigned (unless allow_unassigned=True).
     """
-    if plot_type not in SLOT_ORDERS:
-        msg = f"Unknown plot type: {plot_type!r}. Available types: {list(SLOT_ORDERS.keys())}"
+    slot_orders = _options.slot_orders
+    if plot_type not in slot_orders:
+        msg = f"Unknown plot type: {plot_type!r}. Available types: {list(slot_orders.keys())}"
         raise ValueError(msg)
 
-    slot_order = SLOT_ORDERS[plot_type]
+    slot_order = slot_orders[plot_type]
     dims_list = list(dims)
 
     slots: dict[str, Hashable] = {}
@@ -173,28 +150,58 @@ def to_dataframe(darray: DataArray) -> pd.DataFrame:
     return df
 
 
+def _get_label_from_attrs(attrs: dict, fallback: str) -> str:
+    """
+    Extract a label from xarray attributes based on current config.
+
+    Parameters
+    ----------
+    attrs
+        Attributes dictionary from DataArray or coordinate.
+    fallback
+        Fallback label if no attributes match.
+
+    Returns
+    -------
+    str
+        The formatted label.
+    """
+    label = None
+
+    if _options.label_use_long_name:
+        label = attrs.get("long_name")
+
+    if label is None and _options.label_use_standard_name:
+        label = attrs.get("standard_name")
+
+    if label is None:
+        return fallback
+
+    if _options.label_include_units:
+        units = attrs.get("units")
+        if units:
+            return f"{label} {_options.label_unit_format.format(units=units)}"
+
+    return str(label)
+
+
 def get_label(darray: DataArray, name: Hashable) -> str:
     """
     Get a human-readable label for a dimension or the value column.
 
-    Uses long_name/standard_name and units from attributes if available.
+    Uses long_name/standard_name and units from attributes based on
+    current configuration (see `set_options`).
     """
     # Check if it's asking for the value column label
     value_col = get_value_col(darray)
     if str(name) == value_col or name == "value":
-        label = darray.attrs.get("long_name") or darray.attrs.get("standard_name")
-        if label:
-            units = darray.attrs.get("units")
-            return f"{label} [{units}]" if units else str(label)
-        return value_col
+        return _get_label_from_attrs(darray.attrs, value_col)
 
     # It's a dimension/coordinate
     if name in darray.coords:
         coord = darray.coords[name]
-        label = coord.attrs.get("long_name") or coord.attrs.get("standard_name")
-        if label:
-            units = coord.attrs.get("units")
-            return f"{label} [{units}]" if units else str(label)
+        return _get_label_from_attrs(coord.attrs, str(name))
+
     return str(name)
 
 
