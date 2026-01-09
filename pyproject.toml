@@ -54,8 +54,11 @@ docs = [
 requires = ["setuptools>=61.0.0", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["xarray_plotly*"]
+[tool.setuptools]
+packages = ["xarray_plotly", "xarray-stubs"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed", "*.pyi"]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
