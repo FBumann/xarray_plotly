@@ -7,5 +7,6 @@
 
 - [Getting Started](getting-started.ipynb) - Interactive tutorial
 - [Plot Types](examples/plot-types.ipynb) - All available plot types
-- [Advanced Usage](examples/advanced.ipynb) - Configuration and customization
+- [Dimensions & Facets](examples/dimensions.ipynb) - Control dimension mapping
+- [Figure Customization](examples/figure.ipynb) - Customize your figures
 - [API Reference](api.md) - Full API documentation
