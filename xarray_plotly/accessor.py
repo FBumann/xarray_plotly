@@ -2,16 +2,13 @@
 Accessor classes for Plotly Express plotting on DataArray and Dataset.
 """
 
-from __future__ import annotations
+from typing import Any, ClassVar
 
-from typing import TYPE_CHECKING, Any, ClassVar
+import plotly.graph_objects as go
+from xarray import DataArray
 
 from xarray_plotly import plotting
 from xarray_plotly.common import SlotValue, auto
-
-if TYPE_CHECKING:
-    import plotly.graph_objects as go
-    from xarray import DataArray
 
 
 class DataArrayPlotlyAccessor:
@@ -201,7 +198,6 @@ class DataArrayPlotlyAccessor:
         x: SlotValue = auto,
         y: SlotValue | str = "value",
         color: SlotValue = auto,
-        size: SlotValue = auto,
         symbol: SlotValue = auto,
         facet_col: SlotValue = auto,
         facet_row: SlotValue = auto,
@@ -225,16 +221,14 @@ class DataArrayPlotlyAccessor:
         color
             Dimension for color grouping. Default: second dimension.
             Use "value" to color by DataArray values (useful with y=dimension).
-        size
-            Dimension for marker size. Default: third dimension.
         symbol
-            Dimension for marker symbol. Default: fourth dimension.
+            Dimension for marker symbol. Default: third dimension.
         facet_col
-            Dimension for subplot columns. Default: fifth dimension.
+            Dimension for subplot columns. Default: fourth dimension.
         facet_row
-            Dimension for subplot rows. Default: sixth dimension.
+            Dimension for subplot rows. Default: fifth dimension.
         animation_frame
-            Dimension for animation. Default: seventh dimension.
+            Dimension for animation. Default: sixth dimension.
         **px_kwargs
             Additional arguments passed to `plotly.express.scatter()`.
 
@@ -247,7 +241,6 @@ class DataArrayPlotlyAccessor:
             x=x,
             y=y,
             color=color,
-            size=size,
             symbol=symbol,
             facet_col=facet_col,
             facet_row=facet_row,

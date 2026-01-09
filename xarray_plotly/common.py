@@ -52,7 +52,6 @@ SLOT_ORDERS: dict[str, tuple[str, ...]] = {
     "scatter": (
         "x",
         "color",
-        "size",
         "symbol",
         "facet_col",
         "facet_row",

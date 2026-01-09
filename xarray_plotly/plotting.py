@@ -308,7 +308,6 @@ def scatter(
     x: SlotValue = auto,
     y: SlotValue | str = "value",
     color: SlotValue = auto,
-    size: SlotValue = auto,
     symbol: SlotValue = auto,
     facet_col: SlotValue = auto,
     facet_row: SlotValue = auto,
@@ -322,7 +321,7 @@ def scatter(
     for dimension-vs-dimension plots (e.g., lat vs lon colored by value).
 
     Dimensions fill slots in order:
-    x -> color -> size -> symbol -> facet_col -> facet_row -> animation_frame
+    x -> color -> symbol -> facet_col -> facet_row -> animation_frame
 
     Parameters
     ----------
@@ -336,16 +335,14 @@ def scatter(
     color
         Dimension for color grouping. Default: second dimension.
         Use "value" to color by DataArray values (useful with y=dimension).
-    size
-        Dimension for marker size. Default: third dimension.
     symbol
-        Dimension for marker symbol. Default: fourth dimension.
+        Dimension for marker symbol. Default: third dimension.
     facet_col
-        Dimension for subplot columns. Default: fifth dimension.
+        Dimension for subplot columns. Default: fourth dimension.
     facet_row
-        Dimension for subplot rows. Default: sixth dimension.
+        Dimension for subplot rows. Default: fifth dimension.
     animation_frame
-        Dimension for animation. Default: seventh dimension.
+        Dimension for animation. Default: sixth dimension.
     **px_kwargs
         Additional arguments passed to `plotly.express.scatter()`.
 
@@ -362,7 +359,6 @@ def scatter(
         "scatter",
         x=x,
         color=color,
-        size=size,
         symbol=symbol,
         facet_col=facet_col,
         facet_row=facet_row,
@@ -386,7 +382,6 @@ def scatter(
         x=slots.get("x"),
         y=y_col,
         color=color_col,
-        size=slots.get("size"),
         symbol=slots.get("symbol"),
         facet_col=slots.get("facet_col"),
         facet_row=slots.get("facet_row"),
