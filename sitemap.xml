@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://felix.github.io/xarray_plotly/</loc>
+         <loc>https://fbumann.github.io/xarray_plotly/</loc>
          <lastmod>2026-01-09</lastmod>
     </url>
     <url>
-         <loc>https://felix.github.io/xarray_plotly/api/</loc>
+         <loc>https://fbumann.github.io/xarray_plotly/api/</loc>
          <lastmod>2026-01-09</lastmod>
     </url>
     <url>
-         <loc>https://felix.github.io/xarray_plotly/getting-started/</loc>
+         <loc>https://fbumann.github.io/xarray_plotly/getting-started/</loc>
          <lastmod>2026-01-09</lastmod>
     </url>
     <url>
-         <loc>https://felix.github.io/xarray_plotly/examples/advanced/</loc>
+         <loc>https://fbumann.github.io/xarray_plotly/examples/advanced/</loc>
          <lastmod>2026-01-09</lastmod>
     </url>
     <url>
-         <loc>https://felix.github.io/xarray_plotly/examples/plot-types/</loc>
+         <loc>https://fbumann.github.io/xarray_plotly/examples/plot-types/</loc>
          <lastmod>2026-01-09</lastmod>
     </url>
 </urlset>
