@@ -58,6 +58,9 @@ class Options:
         label_include_units: Append units to labels. Default True.
         label_unit_format: Format string for units. Use `{units}` as placeholder.
         slot_orders: Slot orders per plot type. Keys are plot types, values are tuples.
+        dataset_variable_position: Position of "variable" dim when plotting all Dataset
+            variables. Default 1 (second position, typically color). Set to 0 for first
+            position (x-axis), or -1 for last position.
     """
 
     label_use_long_name: bool = True
@@ -67,6 +70,7 @@ class Options:
     slot_orders: dict[str, tuple[str, ...]] = field(
         default_factory=lambda: dict(DEFAULT_SLOT_ORDERS)
     )
+    dataset_variable_position: int = 1
 
     def to_dict(self) -> dict[str, Any]:
         """Return options as a dictionary."""
@@ -76,6 +80,7 @@ class Options:
             "label_include_units": self.label_include_units,
             "label_unit_format": self.label_unit_format,
             "slot_orders": self.slot_orders,
+            "dataset_variable_position": self.dataset_variable_position,
         }
 
 
@@ -106,6 +111,7 @@ def set_options(
     label_include_units: bool | None = None,
     label_unit_format: str | None = None,
     slot_orders: dict[str, tuple[str, ...]] | None = None,
+    dataset_variable_position: int | None = None,
 ) -> Generator[None, None, None]:
     """Set xarray_plotly options globally or as a context manager.
 
@@ -115,6 +121,8 @@ def set_options(
         label_include_units: Append units to labels.
         label_unit_format: Format string for units. Use `{units}` as placeholder.
         slot_orders: Slot orders per plot type.
+        dataset_variable_position: Position of "variable" dim when plotting all Dataset
+            variables. Default 1 (second, typically color). Use 0 for first, -1 for last.
 
     Yields:
         None when used as a context manager.
@@ -136,6 +144,7 @@ def set_options(
         "label_include_units": _options.label_include_units,
         "label_unit_format": _options.label_unit_format,
         "slot_orders": dict(_options.slot_orders),
+        "dataset_variable_position": _options.dataset_variable_position,
     }
 
     # Apply new values (modify in place to keep reference)
@@ -149,6 +158,8 @@ def set_options(
         _options.label_unit_format = label_unit_format
     if slot_orders is not None:
         _options.slot_orders = dict(slot_orders)
+    if dataset_variable_position is not None:
+        _options.dataset_variable_position = dataset_variable_position
 
     try:
         yield
@@ -159,6 +170,7 @@ def set_options(
         _options.label_include_units = old_values["label_include_units"]
         _options.label_unit_format = old_values["label_unit_format"]
         _options.slot_orders = old_values["slot_orders"]
+        _options.dataset_variable_position = old_values["dataset_variable_position"]
 
 
 def notebook(renderer: str = "notebook") -> None:
