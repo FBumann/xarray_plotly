@@ -257,6 +257,11 @@ class DataArrayPlotlyAccessor:
 
         Slot order: y (rows) -> x (columns) -> facet_col -> animation_frame
 
+        Note:
+            **Difference from px.imshow**: Color bounds are computed from the
+            entire dataset by default, ensuring consistent coloring across
+            animation frames. Use `zmin`/`zmax` to override.
+
         Args:
             x: Dimension for x-axis (columns). Default: second dimension.
             y: Dimension for y-axis (rows). Default: first dimension.

@@ -408,6 +408,14 @@ def imshow(
     Both x and y are dimensions. Dimensions fill slots in order:
     y (rows) -> x (columns) -> facet_col -> animation_frame
 
+    .. note::
+        **Difference from plotly.express.imshow**: By default, color bounds
+        (zmin/zmax) are computed from the **entire dataset**, ensuring
+        consistent coloring across animation frames and facets. In contrast,
+        ``px.imshow`` auto-scales each frame independently, which can make
+        animations visually confusing. Set ``zmin`` and ``zmax`` explicitly
+        to override this behavior.
+
     Parameters
     ----------
     darray
@@ -422,7 +430,7 @@ def imshow(
         Dimension for animation. Default: fourth dimension.
     robust
         If True, compute color bounds using 2nd and 98th percentiles
-        for robustness against outliers. Default: False.
+        for robustness against outliers. Default: False (uses min/max).
     **px_kwargs
         Additional arguments passed to `plotly.express.imshow()`.
         Use `zmin` and `zmax` to manually set color scale bounds.
