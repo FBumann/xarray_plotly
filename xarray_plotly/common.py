@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 from xarray_plotly.config import DEFAULT_SLOT_ORDERS, _options
 
@@ -11,6 +11,24 @@ if TYPE_CHECKING:
 
     import pandas as pd
     from xarray import DataArray
+
+# Type definitions
+PlotType = Literal["line", "bar", "area", "scatter", "imshow", "box", "pie"]
+"""Available plot types."""
+
+SlotName = Literal[
+    "x",
+    "y",
+    "color",
+    "line_dash",
+    "symbol",
+    "facet_col",
+    "facet_row",
+    "animation_frame",
+    "pattern_shape",
+    "names",
+]
+"""Available slot names for dimension assignment."""
 
 
 class _AUTO:
@@ -41,7 +59,7 @@ Note:
 
 def assign_slots(
     dims: Sequence[Hashable],
-    plot_type: str,
+    plot_type: PlotType,
     *,
     allow_unassigned: bool = False,
     **slot_kwargs: SlotValue,
@@ -147,7 +165,7 @@ def to_dataframe(darray: DataArray) -> pd.DataFrame:
     return df
 
 
-def _get_label_from_attrs(attrs: dict, fallback: str) -> str:
+def _get_label_from_attrs(attrs: dict[str, Any], fallback: str) -> str:
     """Extract a label from xarray attributes based on current config.
 
     Args:

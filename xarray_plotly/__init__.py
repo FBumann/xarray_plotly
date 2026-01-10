@@ -104,5 +104,5 @@ def xpx(data: DataArray | Dataset) -> DataArrayPlotlyAccessor | DatasetPlotlyAcc
 __version__ = version("xarray_plotly")
 
 # Register the accessors
-register_dataarray_accessor("plotly")(DataArrayPlotlyAccessor)
-register_dataset_accessor("plotly")(DatasetPlotlyAccessor)
+register_dataarray_accessor("plotly")(DataArrayPlotlyAccessor)  # type: ignore[no-untyped-call]
+register_dataset_accessor("plotly")(DatasetPlotlyAccessor)  # type: ignore[no-untyped-call]

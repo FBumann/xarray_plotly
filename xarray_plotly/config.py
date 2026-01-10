@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+# Type definitions
+PlotType = Literal["line", "bar", "area", "scatter", "imshow", "box", "pie"]
+"""Available plot types."""
 
 # Default slot orders per plot type
-DEFAULT_SLOT_ORDERS: dict[str, tuple[str, ...]] = {
+DEFAULT_SLOT_ORDERS: dict[PlotType, tuple[str, ...]] = {
     "line": (
         "x",
         "color",
@@ -68,7 +71,7 @@ class Options:
     label_include_units: bool = True
     label_unit_format: str = "[{units}]"
     slot_orders: dict[str, tuple[str, ...]] = field(
-        default_factory=lambda: dict(DEFAULT_SLOT_ORDERS)
+        default_factory=lambda: cast("dict[str, tuple[str, ...]]", dict(DEFAULT_SLOT_ORDERS))
     )
     dataset_variable_position: int = 1
 
@@ -137,15 +140,13 @@ def set_options(
         # Units are back after the context
         ```
     """
-    # Store old values
-    old_values = {
-        "label_use_long_name": _options.label_use_long_name,
-        "label_use_standard_name": _options.label_use_standard_name,
-        "label_include_units": _options.label_include_units,
-        "label_unit_format": _options.label_unit_format,
-        "slot_orders": dict(_options.slot_orders),
-        "dataset_variable_position": _options.dataset_variable_position,
-    }
+    # Store old values in typed local variables
+    old_label_use_long_name = _options.label_use_long_name
+    old_label_use_standard_name = _options.label_use_standard_name
+    old_label_include_units = _options.label_include_units
+    old_label_unit_format = _options.label_unit_format
+    old_slot_orders = dict(_options.slot_orders)
+    old_dataset_variable_position = _options.dataset_variable_position
 
     # Apply new values (modify in place to keep reference)
     if label_use_long_name is not None:
@@ -165,12 +166,12 @@ def set_options(
         yield
     finally:
         # Restore old values (modify in place)
-        _options.label_use_long_name = old_values["label_use_long_name"]
-        _options.label_use_standard_name = old_values["label_use_standard_name"]
-        _options.label_include_units = old_values["label_include_units"]
-        _options.label_unit_format = old_values["label_unit_format"]
-        _options.slot_orders = old_values["slot_orders"]
-        _options.dataset_variable_position = old_values["dataset_variable_position"]
+        _options.label_use_long_name = old_label_use_long_name
+        _options.label_use_standard_name = old_label_use_standard_name
+        _options.label_include_units = old_label_include_units
+        _options.label_unit_format = old_label_unit_format
+        _options.slot_orders = old_slot_orders
+        _options.dataset_variable_position = old_dataset_variable_position
 
 
 def notebook(renderer: str = "notebook") -> None:
