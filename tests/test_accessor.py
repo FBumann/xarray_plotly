@@ -292,3 +292,52 @@ class TestDatasetPlotlyAccessor:
         """Test box plot with all variables."""
         fig = self.ds.plotly.box()
         assert isinstance(fig, go.Figure)
+
+
+class TestImshowBounds:
+    """Tests for imshow global bounds and robust mode."""
+
+    def test_imshow_global_bounds(self) -> None:
+        """Test that imshow uses global min/max by default."""
+        da = xr.DataArray(
+            np.array([[[1, 2], [3, 4]], [[5, 6], [7, 100]]]),
+            dims=["time", "y", "x"],
+        )
+        fig = da.plotly.imshow(animation_frame="time")
+        # Check coloraxis for zmin/zmax (plotly stores them there)
+        coloraxis = fig.layout.coloraxis
+        assert coloraxis.cmin == 1.0
+        assert coloraxis.cmax == 100.0
+
+    def test_imshow_robust_bounds(self) -> None:
+        """Test that robust=True uses percentile-based bounds."""
+        # Create data with outlier
+        data = np.random.rand(10, 20) * 100
+        data[0, 0] = 10000  # extreme outlier
+        da = xr.DataArray(data, dims=["y", "x"])
+
+        fig = da.plotly.imshow(robust=True)
+        # With robust=True, cmax should be much less than the outlier
+        coloraxis = fig.layout.coloraxis
+        assert coloraxis.cmax < 10000
+        assert coloraxis.cmax < 200  # Should be around 98th percentile (~98)
+
+    def test_imshow_user_zmin_zmax_override(self) -> None:
+        """Test that user-provided zmin/zmax overrides auto bounds."""
+        da = xr.DataArray(np.random.rand(10, 20) * 100, dims=["y", "x"])
+        fig = da.plotly.imshow(zmin=0, zmax=50)
+        coloraxis = fig.layout.coloraxis
+        assert coloraxis.cmin == 0
+        assert coloraxis.cmax == 50
+
+    def test_imshow_animation_consistent_bounds(self) -> None:
+        """Test that animation frames have consistent color bounds."""
+        da = xr.DataArray(
+            np.array([[[0, 10], [20, 30]], [[40, 50], [60, 70]]]),
+            dims=["time", "y", "x"],
+        )
+        fig = da.plotly.imshow(animation_frame="time")
+        # All frames should use global min (0) and max (70)
+        coloraxis = fig.layout.coloraxis
+        assert coloraxis.cmin == 0.0
+        assert coloraxis.cmax == 70.0

@@ -250,6 +250,7 @@ class DataArrayPlotlyAccessor:
         y: SlotValue = auto,
         facet_col: SlotValue = auto,
         animation_frame: SlotValue = auto,
+        robust: bool = False,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive heatmap image.
@@ -261,7 +262,9 @@ class DataArrayPlotlyAccessor:
             y: Dimension for y-axis (rows). Default: first dimension.
             facet_col: Dimension for subplot columns. Default: third dimension.
             animation_frame: Dimension for animation. Default: fourth dimension.
+            robust: If True, use 2nd/98th percentiles for color bounds (handles outliers).
             **px_kwargs: Additional arguments passed to `plotly.express.imshow()`.
+                Use `zmin` and `zmax` to manually set color scale bounds.
 
         Returns:
             Interactive Plotly Figure.
@@ -272,6 +275,7 @@ class DataArrayPlotlyAccessor:
             y=y,
             facet_col=facet_col,
             animation_frame=animation_frame,
+            robust=robust,
             **px_kwargs,
         )
 

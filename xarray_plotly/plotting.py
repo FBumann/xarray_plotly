@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import plotly.express as px
 
 from xarray_plotly.common import (
@@ -398,6 +399,7 @@ def imshow(
     y: SlotValue = auto,
     facet_col: SlotValue = auto,
     animation_frame: SlotValue = auto,
+    robust: bool = False,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -418,8 +420,12 @@ def imshow(
         Dimension for subplot columns. Default: third dimension.
     animation_frame
         Dimension for animation. Default: fourth dimension.
+    robust
+        If True, compute color bounds using 2nd and 98th percentiles
+        for robustness against outliers. Default: False.
     **px_kwargs
         Additional arguments passed to `plotly.express.imshow()`.
+        Use `zmin` and `zmax` to manually set color scale bounds.
 
     Returns
     -------
@@ -439,6 +445,20 @@ def imshow(
         slots[k] for k in ("y", "x", "facet_col", "animation_frame") if slots.get(k) is not None
     ]
     plot_data = darray.transpose(*transpose_order) if transpose_order else darray
+
+    # Compute global color bounds if not provided
+    if "zmin" not in px_kwargs or "zmax" not in px_kwargs:
+        values = plot_data.values
+        if robust:
+            # Use percentiles for outlier robustness
+            zmin = float(np.nanpercentile(values, 2))
+            zmax = float(np.nanpercentile(values, 98))
+        else:
+            # Use global min/max across all data
+            zmin = float(np.nanmin(values))
+            zmax = float(np.nanmax(values))
+        px_kwargs.setdefault("zmin", zmin)
+        px_kwargs.setdefault("zmax", zmax)
 
     return px.imshow(
         plot_data,
