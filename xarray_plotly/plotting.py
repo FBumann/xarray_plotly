@@ -167,12 +167,31 @@ def bar(
     )
 
 
-def _apply_barlike_style(traces: tuple) -> None:
-    """Apply bar-like styling to area traces (in-place)."""
+def _apply_barlike_style(traces: tuple, mixed_signs: bool = False) -> None:
+    """Apply bar-like styling to area traces (in-place).
+
+    Parameters
+    ----------
+    traces
+        The traces to style.
+    mixed_signs
+        If True, disable stacking and fill to zero for mixed positive/negative data.
+    """
     for trace in traces:
         color = trace.line.color
         trace.fillcolor = color
         trace.line = {"width": 0, "color": color, "shape": "hv"}
+        if mixed_signs:
+            trace.stackgroup = None
+            trace.fill = "tozeroy"
+
+
+def _has_mixed_signs(values: np.ndarray) -> bool:
+    """Check if data contains both positive and negative values."""
+    finite = values[np.isfinite(values)]
+    if len(finite) == 0:
+        return False
+    return bool(np.any(finite > 0) and np.any(finite < 0))
 
 
 def fast_bar(
@@ -194,6 +213,10 @@ def fast_bar(
 
     The y-axis shows DataArray values. Dimensions fill slots in order:
     x -> color -> facet_col -> facet_row -> animation_frame
+
+    Note: For mixed positive/negative data, stacking is disabled and each
+    series fills independently to zero. For best stacking behavior with
+    mixed data, use `bar()` instead.
 
     Parameters
     ----------
@@ -226,6 +249,9 @@ def fast_bar(
         animation_frame=animation_frame,
     )
 
+    # Check for mixed positive/negative values
+    mixed_signs = _has_mixed_signs(darray.values)
+
     df = to_dataframe(darray)
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
@@ -243,9 +269,9 @@ def fast_bar(
         **px_kwargs,
     )
 
-    _apply_barlike_style(fig.data)
+    _apply_barlike_style(fig.data, mixed_signs)
     for frame in fig.frames:
-        _apply_barlike_style(frame.data)
+        _apply_barlike_style(frame.data, mixed_signs)
 
     return fig
 

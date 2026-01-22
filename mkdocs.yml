@@ -73,4 +73,7 @@ nav:
       - Dimensions & Facets: examples/dimensions.ipynb
       - Plotly Express Options: examples/kwargs.ipynb
       - Figure Customization: examples/figure.ipynb
+      - Combining Figures: examples/combining.ipynb
+      - Figure Manipulation: examples/manipulation.ipynb
+      - Fast Bar Charts: examples/fast_bar.ipynb
   - API Reference: api.md

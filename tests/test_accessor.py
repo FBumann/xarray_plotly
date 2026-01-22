@@ -173,6 +173,27 @@ class TestDataArrayPxplot:
                 assert trace.line.shape == "hv"
                 assert trace.fillcolor is not None
 
+    def test_fast_bar_mixed_signs_no_stacking(self) -> None:
+        """Test that fast_bar disables stacking for mixed positive/negative data."""
+        da = xr.DataArray(
+            np.array([[50, -30], [-40, 60]]),
+            dims=["time", "category"],
+        )
+        fig = da.plotly.fast_bar()
+        for trace in fig.data:
+            assert trace.stackgroup is None
+            assert trace.fill == "tozeroy"
+
+    def test_fast_bar_same_sign_stacks(self) -> None:
+        """Test that fast_bar uses stacking for same-sign data."""
+        da = xr.DataArray(
+            np.random.rand(5, 3) * 100,
+            dims=["time", "category"],
+        )
+        fig = da.plotly.fast_bar()
+        for trace in fig.data:
+            assert trace.stackgroup is not None
+
     def test_scatter_returns_figure(self) -> None:
         """Test that scatter() returns a Plotly Figure."""
         fig = self.da_2d.plotly.scatter()
