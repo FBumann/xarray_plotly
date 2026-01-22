@@ -29,3 +29,15 @@ jobs:
         with:
           generate_release_notes: true
           files: dist/*
+
+      - name: Install docs dependencies
+        run: uv sync --extra docs
+
+      - name: Build docs
+        run: uv run mkdocs build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site

@@ -3,11 +3,6 @@ name: Docs
 on:
   pull_request:
     branches: [main]
-  release:
-    types: [published]
-
-permissions:
-  contents: write
 
 jobs:
   docs:
@@ -24,10 +19,3 @@ jobs:
 
       - name: Build docs
         run: uv run mkdocs build
-
-      - name: Deploy to GitHub Pages
-        if: github.event_name == 'release'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
