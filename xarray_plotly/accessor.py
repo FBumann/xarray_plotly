@@ -34,7 +34,7 @@ class DataArrayPlotlyAccessor:
         ```
     """
 
-    __all__: ClassVar = ["line", "bar", "area", "scatter", "box", "imshow", "pie"]
+    __all__: ClassVar = ["line", "bar", "fast_bar", "area", "scatter", "box", "imshow", "pie"]
 
     def __init__(self, darray: DataArray) -> None:
         self._da = darray
@@ -384,7 +384,7 @@ class DatasetPlotlyAccessor:
         ```
     """
 
-    __all__: ClassVar = ["line", "bar", "area", "scatter", "box", "pie"]
+    __all__: ClassVar = ["line", "bar", "fast_bar", "area", "scatter", "box", "pie"]
 
     def __init__(self, dataset: Dataset) -> None:
         self._ds = dataset
