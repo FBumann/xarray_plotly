@@ -4,6 +4,7 @@ Plotly Express plotting functions for DataArray objects.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -211,15 +212,27 @@ def _style_traces_as_bars(fig: go.Figure) -> None:
 
     # Build classification map
     class_map: dict[str, str] = {}
+    mixed_traces: list[str] = []
     for name, flags in sign_flags.items():
         if flags["has_pos"] and flags["has_neg"]:
             class_map[name] = "mixed"
+            mixed_traces.append(name)
         elif flags["has_neg"]:
             class_map[name] = "negative"
         elif flags["has_pos"]:
             class_map[name] = "positive"
         else:
             class_map[name] = "zero"
+
+    # Warn about mixed traces
+    if mixed_traces:
+        warnings.warn(
+            f"fast_bar: traces {mixed_traces} have mixed positive/negative values "
+            "and cannot be stacked. They are shown as dashed lines. "
+            "Consider using bar() for proper stacking of mixed data.",
+            UserWarning,
+            stacklevel=3,
+        )
 
     # Apply styling to all traces
     for trace in all_traces:
