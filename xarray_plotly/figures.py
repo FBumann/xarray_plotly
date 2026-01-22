@@ -8,7 +8,26 @@ import copy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import plotly.graph_objects as go
+
+
+def _iter_all_traces(fig: go.Figure) -> Iterator:
+    """Iterate over all traces in a figure, including animation frames.
+
+    Yields traces from fig.data first, then from each frame in fig.frames.
+    Useful for applying styling to all traces including those in animations.
+
+    Args:
+        fig: Plotly Figure.
+
+    Yields:
+        Each trace object from the figure.
+    """
+    yield from fig.data
+    for frame in fig.frames or []:
+        yield from frame.data
 
 
 def _get_subplot_axes(fig: go.Figure) -> set[tuple[str, str]]:
@@ -418,15 +437,12 @@ def update_traces(fig: go.Figure, selector: dict | None = None, **kwargs) -> go.
         >>> # Update specific trace by name
         >>> update_traces(fig, selector={"name": "Germany"}, line_width=5, line_dash="dot")
     """
-    fig.update_traces(selector=selector, **kwargs)
-
-    for frame in fig.frames:
-        for trace in frame.data:
-            if selector is None:
+    for trace in _iter_all_traces(fig):
+        if selector is None:
+            trace.update(**kwargs)
+        else:
+            # Check if trace matches all selector criteria
+            if all(getattr(trace, k, None) == v for k, v in selector.items()):
                 trace.update(**kwargs)
-            else:
-                # Check if trace matches all selector criteria
-                if all(getattr(trace, k, None) == v for k, v in selector.items()):
-                    trace.update(**kwargs)
 
     return fig

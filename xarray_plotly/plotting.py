@@ -19,6 +19,9 @@ from xarray_plotly.common import (
     get_value_col,
     to_dataframe,
 )
+from xarray_plotly.figures import (
+    _iter_all_traces,
+)
 
 if TYPE_CHECKING:
     import plotly.graph_objects as go
@@ -192,9 +195,7 @@ def _style_traces_as_bars(fig: go.Figure) -> None:
     then assigns stackgroups: positive traces stack upward, negative stack downward.
     """
     # Collect all traces (main + animation frames)
-    all_traces = list(fig.data)
-    for frame in fig.frames:
-        all_traces.extend(frame.data)
+    all_traces = list(_iter_all_traces(fig))
 
     # Classify each trace name by aggregating sign info across all occurrences
     sign_flags: dict[str, dict[str, bool]] = {}
