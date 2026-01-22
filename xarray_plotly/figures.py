@@ -129,7 +129,7 @@ def _merge_frames(
     return merged_frames
 
 
-def overlay_figures(base: go.Figure, *overlays: go.Figure) -> go.Figure:
+def overlay(base: go.Figure, *overlays: go.Figure) -> go.Figure:
     """Overlay multiple Plotly figures on the same axes.
 
     Creates a new figure with the base figure's layout, sliders, and buttons,
@@ -150,18 +150,18 @@ def overlay_figures(base: go.Figure, *overlays: go.Figure) -> go.Figure:
     Example:
         >>> import numpy as np
         >>> import xarray as xr
-        >>> from xarray_plotly import xpx, overlay_figures
+        >>> from xarray_plotly import xpx, overlay
         >>>
         >>> da = xr.DataArray(np.random.rand(10, 3), dims=["time", "cat"])
         >>> area_fig = xpx(da).area()
         >>> line_fig = xpx(da).line()
-        >>> combined = overlay_figures(area_fig, line_fig)
+        >>> combined = overlay(area_fig, line_fig)
         >>>
         >>> # With animation
         >>> da3d = xr.DataArray(np.random.rand(10, 3, 4), dims=["x", "cat", "time"])
         >>> area = xpx(da3d).area(animation_frame="time")
         >>> line = xpx(da3d).line(animation_frame="time")
-        >>> combined = overlay_figures(area, line)
+        >>> combined = overlay(area, line)
     """
     import plotly.graph_objects as go
 
@@ -194,10 +194,6 @@ def overlay_figures(base: go.Figure, *overlays: go.Figure) -> go.Figure:
         combined.frames = merged_frames
 
     return combined
-
-
-# Backwards compatibility alias
-combine_figures = overlay_figures
 
 
 def _build_secondary_y_mapping(base_axes: set[tuple[str, str]]) -> dict[str, str]:
@@ -392,3 +388,45 @@ def _merge_secondary_y_frames(
         )
 
     return merged_frames
+
+
+def update_animation_traces(fig: go.Figure, selector: dict | None = None, **kwargs) -> go.Figure:
+    """Update traces in both base figure and all animation frames.
+
+    Plotly's `update_traces()` only updates the base figure, not animation frames.
+    This function updates both, ensuring trace styles persist during animation.
+
+    Args:
+        fig: A Plotly figure, optionally with animation frames.
+        selector: Dict to match specific traces, e.g. ``{"name": "Germany"}``.
+            If None, updates all traces.
+        **kwargs: Trace properties to update, e.g. ``line_width=4``, ``line_dash="dot"``.
+
+    Returns:
+        The modified figure (same object, mutated in place).
+
+    Example:
+        >>> import plotly.express as px
+        >>> from xarray_plotly import update_animation_traces
+        >>>
+        >>> df = px.data.gapminder()
+        >>> fig = px.line(df, x="year", y="gdpPercap", color="country", animation_frame="continent")
+        >>>
+        >>> # Update all traces
+        >>> update_animation_traces(fig, line_width=3)
+        >>>
+        >>> # Update specific trace by name
+        >>> update_animation_traces(fig, selector={"name": "Germany"}, line_width=5, line_dash="dot")
+    """
+    fig.update_traces(selector=selector, **kwargs)
+
+    for frame in fig.frames:
+        for trace in frame.data:
+            if selector is None:
+                trace.update(**kwargs)
+            else:
+                # Check if trace matches all selector criteria
+                if all(getattr(trace, k, None) == v for k, v in selector.items()):
+                    trace.update(**kwargs)
+
+    return fig

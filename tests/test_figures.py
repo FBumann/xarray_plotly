@@ -1,4 +1,4 @@
-"""Tests for the figures module (overlay_figures, add_secondary_y)."""
+"""Tests for the figures module (overlay, add_secondary_y)."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ import plotly.graph_objects as go
 import pytest
 import xarray as xr
 
-from xarray_plotly import add_secondary_y, combine_figures, overlay_figures, xpx
+from xarray_plotly import add_secondary_y, overlay, xpx
 
 
-class TestCombineFiguresBasic:
-    """Basic tests for combine_figures function."""
+class TestOverlayBasic:
+    """Basic tests for overlay function."""
 
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
@@ -28,7 +28,7 @@ class TestCombineFiguresBasic:
     def test_no_overlays_returns_copy(self) -> None:
         """Test that no overlays returns a deep copy of base."""
         base = xpx(self.da_2d).line()
-        result = combine_figures(base)
+        result = overlay(base)
 
         assert isinstance(result, go.Figure)
         assert len(result.data) == len(base.data)
@@ -41,7 +41,7 @@ class TestCombineFiguresBasic:
         area_fig = xpx(self.da_2d).area()
         line_fig = xpx(self.da_2d).line()
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         assert isinstance(combined, go.Figure)
         expected_trace_count = len(area_fig.data) + len(line_fig.data)
@@ -52,7 +52,7 @@ class TestCombineFiguresBasic:
         area_fig = xpx(self.da_2d).area(title="My Area Plot")
         line_fig = xpx(self.da_2d).line(title="My Line Plot")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         assert combined.layout.title.text == "My Area Plot"
 
@@ -62,7 +62,7 @@ class TestCombineFiguresBasic:
         line_fig = xpx(self.da_2d).line()
         scatter_fig = xpx(self.da_2d).scatter()
 
-        combined = combine_figures(area_fig, line_fig, scatter_fig)
+        combined = overlay(area_fig, line_fig, scatter_fig)
 
         expected_count = len(area_fig.data) + len(line_fig.data) + len(scatter_fig.data)
         assert len(combined.data) == expected_count
@@ -76,7 +76,7 @@ class TestCombineFiguresBasic:
         fig1 = xpx(da_1).line()
         fig2 = xpx(da_2).line()
 
-        combined = combine_figures(fig1, fig2)
+        combined = overlay(fig1, fig2)
 
         # First trace should have y values from fig1
         assert list(combined.data[0].y) == [1, 2, 3]
@@ -84,8 +84,8 @@ class TestCombineFiguresBasic:
         assert list(combined.data[1].y) == [10, 20, 30]
 
 
-class TestCombineFiguresFacets:
-    """Tests for combine_figures with faceted figures."""
+class TestOverlayFacets:
+    """Tests for overlay with faceted figures."""
 
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
@@ -106,7 +106,7 @@ class TestCombineFiguresFacets:
         area_fig = xpx(self.da_3d).area(facet_col="facet")
         line_fig = xpx(self.da_3d).line(facet_col="facet")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         assert isinstance(combined, go.Figure)
         expected_count = len(area_fig.data) + len(line_fig.data)
@@ -117,17 +117,17 @@ class TestCombineFiguresFacets:
         # Base without facets
         base = xpx(self.da_3d.isel(facet=0)).line()
         # Overlay with facets
-        overlay = xpx(self.da_3d).line(facet_col="facet")
+        overlay_fig = xpx(self.da_3d).line(facet_col="facet")
 
         with pytest.raises(ValueError, match="subplots not present in base"):
-            combine_figures(base, overlay)
+            overlay(base, overlay_fig)
 
     def test_preserves_axis_references(self) -> None:
         """Test that traces preserve their xaxis/yaxis references."""
         area_fig = xpx(self.da_3d).area(facet_col="facet")
         line_fig = xpx(self.da_3d).line(facet_col="facet")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         # Collect axis references from both original and combined
         original_axes = set()
@@ -146,8 +146,8 @@ class TestCombineFiguresFacets:
         assert combined_axes == original_axes
 
 
-class TestCombineFiguresAnimation:
-    """Tests for combine_figures with animated figures."""
+class TestOverlayAnimation:
+    """Tests for overlay with animated figures."""
 
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
@@ -168,7 +168,7 @@ class TestCombineFiguresAnimation:
         area_fig = xpx(self.da_3d).area(animation_frame="time")
         line_fig = xpx(self.da_3d).line(animation_frame="time")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         assert isinstance(combined, go.Figure)
         # Should have same number of frames
@@ -183,7 +183,7 @@ class TestCombineFiguresAnimation:
         animated = xpx(self.da_3d).area(animation_frame="time")
         static = xpx(self.da_3d.isel(time=0)).line()
 
-        combined = combine_figures(animated, static)
+        combined = overlay(animated, static)
 
         # Combined should have all frames from animated figure
         assert len(combined.frames) == len(animated.frames)
@@ -200,7 +200,7 @@ class TestCombineFiguresAnimation:
         animated = xpx(self.da_3d).area(animation_frame="time")
 
         with pytest.raises(ValueError, match="base figure does not"):
-            combine_figures(static, animated)
+            overlay(static, animated)
 
     def test_mismatched_frame_names_raises(self) -> None:
         """Test that mismatched frame names raise ValueError."""
@@ -219,22 +219,22 @@ class TestCombineFiguresAnimation:
         fig2 = xpx(da2).line(animation_frame="time")
 
         with pytest.raises(ValueError, match="frame names don't match"):
-            combine_figures(fig1, fig2)
+            overlay(fig1, fig2)
 
     def test_frame_names_preserved(self) -> None:
         """Test that frame names are preserved in combined figure."""
         area_fig = xpx(self.da_3d).area(animation_frame="time")
         line_fig = xpx(self.da_3d).line(animation_frame="time")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         original_names = {frame.name for frame in area_fig.frames}
         combined_names = {frame.name for frame in combined.frames}
         assert original_names == combined_names
 
 
-class TestCombineFiguresFacetsAndAnimation:
-    """Tests for combine_figures with both facets and animation."""
+class TestOverlayFacetsAndAnimation:
+    """Tests for overlay with both facets and animation."""
 
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
@@ -256,7 +256,7 @@ class TestCombineFiguresFacetsAndAnimation:
         area_fig = xpx(self.da_4d).area(facet_col="facet", animation_frame="time")
         line_fig = xpx(self.da_4d).line(facet_col="facet", animation_frame="time")
 
-        combined = combine_figures(area_fig, line_fig)
+        combined = overlay(area_fig, line_fig)
 
         assert isinstance(combined, go.Figure)
         # Check trace count
@@ -270,7 +270,7 @@ class TestCombineFiguresFacetsAndAnimation:
         animated = xpx(self.da_4d).area(facet_col="facet", animation_frame="time")
         static = xpx(self.da_4d.isel(time=0)).line(facet_col="facet")
 
-        combined = combine_figures(animated, static)
+        combined = overlay(animated, static)
 
         # Should have same frames as animated
         assert len(combined.frames) == len(animated.frames)
@@ -280,8 +280,8 @@ class TestCombineFiguresFacetsAndAnimation:
             assert len(frame.data) == expected
 
 
-class TestCombineFiguresDeepCopy:
-    """Tests to ensure combine_figures creates deep copies."""
+class TestOverlayDeepCopy:
+    """Tests to ensure overlay creates deep copies."""
 
     def test_base_not_modified(self) -> None:
         """Test that base figure is not modified."""
@@ -290,8 +290,8 @@ class TestCombineFiguresDeepCopy:
         original_trace_count = len(base.data)
         original_title = copy.deepcopy(base.layout.title)
 
-        overlay = xpx(da).line()
-        _ = combine_figures(base, overlay)
+        overlay_fig = xpx(da).line()
+        _ = overlay(base, overlay_fig)
 
         # Base should be unchanged
         assert len(base.data) == original_trace_count
@@ -301,47 +301,27 @@ class TestCombineFiguresDeepCopy:
         """Test that overlay figure is not modified."""
         da = xr.DataArray(np.random.rand(10, 3), dims=["x", "cat"])
         base = xpx(da).area()
-        overlay = xpx(da).line()
-        original_trace_count = len(overlay.data)
+        overlay_fig = xpx(da).line()
+        original_trace_count = len(overlay_fig.data)
 
-        _ = combine_figures(base, overlay)
+        _ = overlay(base, overlay_fig)
 
         # Overlay should be unchanged
-        assert len(overlay.data) == original_trace_count
+        assert len(overlay_fig.data) == original_trace_count
 
     def test_combined_traces_independent(self) -> None:
         """Test that combined traces are independent of originals."""
         da = xr.DataArray(np.random.rand(10, 3), dims=["x", "cat"])
         base = xpx(da).area()
-        overlay = xpx(da).line()
+        overlay_fig = xpx(da).line()
 
-        combined = combine_figures(base, overlay)
+        combined = overlay(base, overlay_fig)
 
         # Modify combined figure
         combined.data[0].name = "modified"
 
         # Originals should be unchanged
         assert base.data[0].name != "modified"
-
-
-class TestOverlayFiguresAlias:
-    """Test that overlay_figures and combine_figures are equivalent."""
-
-    def test_overlay_figures_is_combine_figures(self) -> None:
-        """Test that overlay_figures is the same function as combine_figures."""
-        assert overlay_figures is combine_figures
-
-    def test_overlay_figures_works(self) -> None:
-        """Test that overlay_figures works correctly."""
-        da = xr.DataArray(np.random.rand(10, 3), dims=["x", "cat"])
-        area_fig = xpx(da).area()
-        line_fig = xpx(da).line()
-
-        combined = overlay_figures(area_fig, line_fig)
-
-        assert isinstance(combined, go.Figure)
-        expected_count = len(area_fig.data) + len(line_fig.data)
-        assert len(combined.data) == expected_count
 
 
 class TestAddSecondaryYBasic:
