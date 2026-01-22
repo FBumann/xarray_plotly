@@ -12,43 +12,41 @@ Features:
     - **Customizable**: Returns Plotly Figure objects for further modification
 
 Usage:
-Mos    Recommended::
-
-        import xarray_plotly as xpx
-
-        fig = xpx(da).line()           # Create plots
-        combined = xpx.overlay(fig1, fig2)  # Use helper functions
-
     Accessor style::
 
         import xarray_plotly
         fig = da.plotly.line()
+        fig = ds.plotly.line()  # Dataset: all variables
+
+    Function style (recommended for IDE completion)::
+
+        from xarray_plotly import xpx
+        fig = xpx(da).line()
+        fig = xpx(ds).line()  # Dataset: all variables
 
 Example:
     ```python
     import xarray as xr
     import numpy as np
-    import xarray_plotly as xpx
+    from xarray_plotly import xpx
 
     da = xr.DataArray(
         np.random.rand(10, 3, 2),
         dims=["time", "city", "scenario"],
     )
     fig = xpx(da).line()  # Auto: time->x, city->color, scenario->facet_col
+    fig = xpx(da).line(x="time", color="scenario")  # Explicit
+    fig = xpx(da).line(color=None)  # Skip slot
 
-    # Combine figures
-    area = xpx(da).area()
-    line = xpx(da).line()
-    combined = xpx.overlay(area, line)
+    # Dataset: plot all variables (accessor or xpx)
+    ds = xr.Dataset({"temp": da, "precip": da})
+    fig = xpx(ds).line()  # "variable" dimension for color
+    fig = xpx(ds).line(facet_col="variable")  # Facet by variable
     ```
 """
 
-from __future__ import annotations
-
-import sys
-import types
 from importlib.metadata import version
-from typing import TYPE_CHECKING, overload
+from typing import overload
 
 from xarray import DataArray, Dataset, register_dataarray_accessor, register_dataset_accessor
 
@@ -68,67 +66,49 @@ __all__ = [
     "config",
     "overlay",
     "update_traces",
+    "xpx",
 ]
+
+
+@overload
+def xpx(data: DataArray) -> DataArrayPlotlyAccessor: ...
+
+
+@overload
+def xpx(data: Dataset) -> DatasetPlotlyAccessor: ...
+
+
+def xpx(data: DataArray | Dataset) -> DataArrayPlotlyAccessor | DatasetPlotlyAccessor:
+    """Get the plotly accessor for a DataArray or Dataset with full IDE code completion.
+
+    This is an alternative to `da.plotly` / `ds.plotly` that provides proper type hints
+    and code completion in IDEs.
+
+    Args:
+        data: The DataArray or Dataset to plot.
+
+    Returns:
+        The accessor with plotting methods (line, bar, area, scatter, box, imshow).
+
+    Example:
+        ```python
+        from xarray_plotly import xpx
+
+        # DataArray
+        fig = xpx(da).line()  # Full code completion works here
+
+        # Dataset
+        fig = xpx(ds).line()  # Plots all variables
+        fig = xpx(ds).line(var="temperature")  # Single variable
+        ```
+    """
+    if isinstance(data, Dataset):
+        return DatasetPlotlyAccessor(data)
+    return DataArrayPlotlyAccessor(data)
+
 
 __version__ = version("xarray_plotly")
 
 # Register the accessors
 register_dataarray_accessor("plotly")(DataArrayPlotlyAccessor)
 register_dataset_accessor("plotly")(DatasetPlotlyAccessor)
-
-
-class _CallableModule(types.ModuleType):
-    """A module that can be called as a function.
-
-    Enables the pattern::
-
-        import xarray_plotly as xpx
-        fig = xpx(da).line()        # Call module as function
-        fig = xpx.overlay(a, b)     # Access module attributes
-    """
-
-    @overload
-    def __call__(self, data: DataArray) -> DataArrayPlotlyAccessor: ...
-
-    @overload
-    def __call__(self, data: Dataset) -> DatasetPlotlyAccessor: ...
-
-    def __call__(
-        self, data: DataArray | Dataset
-    ) -> DataArrayPlotlyAccessor | DatasetPlotlyAccessor:
-        """Get the plotly accessor for a DataArray or Dataset.
-
-        Args:
-            data: The DataArray or Dataset to plot.
-
-        Returns:
-            The accessor with plotting methods (line, bar, area, scatter, box, imshow, pie).
-
-        Example:
-            ```python
-            import xarray_plotly as xpx
-
-            fig = xpx(da).line()
-            fig = xpx(ds).line(var="temperature")
-            ```
-        """
-        if isinstance(data, Dataset):
-            return DatasetPlotlyAccessor(data)
-        return DataArrayPlotlyAccessor(data)
-
-
-# Make the module callable
-sys.modules[__name__].__class__ = _CallableModule
-
-# For type checking, expose the call signature
-if TYPE_CHECKING:
-
-    @overload
-    def __call__(data: DataArray) -> DataArrayPlotlyAccessor: ...
-
-    @overload
-    def __call__(data: Dataset) -> DatasetPlotlyAccessor: ...
-
-    def __call__(
-        data: DataArray | Dataset,
-    ) -> DataArrayPlotlyAccessor | DatasetPlotlyAccessor: ...
