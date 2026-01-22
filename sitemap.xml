@@ -2,34 +2,46 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/api/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/getting-started/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
+    </url>
+    <url>
+         <loc>https://fbumann.github.io/xarray_plotly/examples/combining/</loc>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/examples/datasets/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/examples/dimensions/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
+    </url>
+    <url>
+         <loc>https://fbumann.github.io/xarray_plotly/examples/fast_bar/</loc>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/examples/figure/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/examples/kwargs/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
+    </url>
+    <url>
+         <loc>https://fbumann.github.io/xarray_plotly/examples/manipulation/</loc>
+         <lastmod>2026-01-22</lastmod>
     </url>
     <url>
          <loc>https://fbumann.github.io/xarray_plotly/examples/plot-types/</loc>
-         <lastmod>2026-01-09</lastmod>
+         <lastmod>2026-01-22</lastmod>
     </url>
 </urlset>
