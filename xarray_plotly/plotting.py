@@ -167,74 +167,78 @@ def bar(
     )
 
 
-def _apply_barlike_style(traces: tuple) -> None:
-    """Apply bar-like styling to area traces (in-place)."""
-    for trace in traces:
-        color = trace.line.color
-        trace.fillcolor = color
-        trace.line = {"width": 0, "color": color, "shape": "hv"}
+def _classify_trace_sign(y_values: np.ndarray) -> str:
+    """Classify a trace as 'positive', 'negative', or 'mixed' based on its values."""
+    y_arr = np.asarray(y_values)
+    y_clean = y_arr[np.isfinite(y_arr) & (np.abs(y_arr) > 1e-9)]
+    if len(y_clean) == 0:
+        return "zero"
+    has_pos = bool(np.any(y_clean > 0))
+    has_neg = bool(np.any(y_clean < 0))
+    if has_pos and has_neg:
+        return "mixed"
+    elif has_neg:
+        return "negative"
+    elif has_pos:
+        return "positive"
+    return "zero"
 
 
-def _has_mixed_signs(values: np.ndarray) -> bool:
-    """Check if data contains both positive and negative values."""
-    finite = values[np.isfinite(values)]
-    if len(finite) == 0:
-        return False
-    return bool(np.any(finite > 0) and np.any(finite < 0))
+def _style_traces_as_bars(fig: go.Figure) -> None:
+    """Style area chart traces to look like bar charts with proper pos/neg stacking.
 
-
-def _split_traces_by_sign(traces: tuple) -> list:
-    """Split traces into separate positive and negative stackgroups.
-
-    For mixed positive/negative data, this creates proper bar-like stacking
-    where positives stack upward and negatives stack downward from zero.
+    Classifies each trace (by name) across all data and animation frames,
+    then assigns stackgroups: positive traces stack upward, negative stack downward.
     """
-    import plotly.graph_objects as go
+    # Collect all traces (main + animation frames)
+    all_traces = list(fig.data)
+    for frame in fig.frames:
+        all_traces.extend(frame.data)
 
-    new_traces = []
-    for trace in traces:
-        y_values = np.array(trace.y)
+    # Classify each trace name by aggregating sign info across all occurrences
+    sign_flags: dict[str, dict[str, bool]] = {}
+    for trace in all_traces:
+        if trace.name not in sign_flags:
+            sign_flags[trace.name] = {"has_pos": False, "has_neg": False}
+        if trace.y is not None and len(trace.y) > 0:
+            y_arr = np.asarray(trace.y)
+            y_clean = y_arr[np.isfinite(y_arr) & (np.abs(y_arr) > 1e-9)]
+            if len(y_clean) > 0:
+                if np.any(y_clean > 0):
+                    sign_flags[trace.name]["has_pos"] = True
+                if np.any(y_clean < 0):
+                    sign_flags[trace.name]["has_neg"] = True
+
+    # Build classification map
+    class_map: dict[str, str] = {}
+    for name, flags in sign_flags.items():
+        if flags["has_pos"] and flags["has_neg"]:
+            class_map[name] = "mixed"
+        elif flags["has_neg"]:
+            class_map[name] = "negative"
+        elif flags["has_pos"]:
+            class_map[name] = "positive"
+        else:
+            class_map[name] = "zero"
+
+    # Apply styling to all traces
+    for trace in all_traces:
         color = trace.line.color
-        name = trace.name
+        cls = class_map.get(trace.name, "positive")
 
-        # Positive trace (negatives become 0)
-        y_pos = np.clip(y_values, 0, None)
-        if np.any(y_pos > 0):
-            new_traces.append(
-                go.Scatter(
-                    x=trace.x,
-                    y=y_pos,
-                    name=name,
-                    stackgroup="positive",
-                    line={"width": 0, "shape": "hv", "color": color},
-                    fillcolor=color,
-                    mode="lines",
-                    legendgroup=name,
-                    xaxis=trace.xaxis,
-                    yaxis=trace.yaxis,
-                )
-            )
-
-        # Negative trace (positives become 0)
-        y_neg = np.clip(y_values, None, 0)
-        if np.any(y_neg < 0):
-            new_traces.append(
-                go.Scatter(
-                    x=trace.x,
-                    y=y_neg,
-                    name=name,
-                    stackgroup="negative",
-                    line={"width": 0, "shape": "hv", "color": color},
-                    fillcolor=color,
-                    mode="lines",
-                    legendgroup=name,
-                    showlegend=False,
-                    xaxis=trace.xaxis,
-                    yaxis=trace.yaxis,
-                )
-            )
-
-    return new_traces
+        if cls in ("positive", "negative"):
+            trace.stackgroup = cls
+            trace.fillcolor = color
+            trace.line = {"width": 0, "color": color, "shape": "hv"}
+        elif cls == "mixed":
+            # Mixed: no stacking, show as dashed line
+            trace.stackgroup = None
+            trace.fill = None
+            trace.line = {"width": 2, "color": color, "shape": "hv", "dash": "dash"}
+        else:  # zero
+            trace.stackgroup = None
+            trace.fill = None
+            trace.line = {"width": 0, "color": color, "shape": "hv"}
 
 
 def fast_bar(
@@ -257,8 +261,9 @@ def fast_bar(
     The y-axis shows DataArray values. Dimensions fill slots in order:
     x -> color -> facet_col -> facet_row -> animation_frame
 
-    For mixed positive/negative data, positives stack upward and negatives
-    stack downward from zero, similar to bar chart behavior.
+    Traces are classified by their values: purely positive traces stack upward,
+    purely negative traces stack downward. Traces with mixed signs are shown
+    as dashed lines without stacking.
 
     Parameters
     ----------
@@ -281,8 +286,6 @@ def fast_bar(
     -------
     plotly.graph_objects.Figure
     """
-    import plotly.graph_objects as go
-
     slots = assign_slots(
         list(darray.dims),
         "fast_bar",
@@ -293,14 +296,11 @@ def fast_bar(
         animation_frame=animation_frame,
     )
 
-    # Check for mixed positive/negative values
-    mixed_signs = _has_mixed_signs(darray.values)
-
     df = to_dataframe(darray)
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
 
-    base_fig = px.area(
+    fig = px.area(
         df,
         x=slots.get("x"),
         y=value_col,
@@ -313,23 +313,7 @@ def fast_bar(
         **px_kwargs,
     )
 
-    if mixed_signs:
-        # Split traces into positive/negative stackgroups for proper stacking
-        new_traces = _split_traces_by_sign(base_fig.data)
-        fig = go.Figure(data=new_traces, layout=base_fig.layout)
-
-        # Handle animation frames
-        new_frames = []
-        for frame in base_fig.frames:
-            frame_traces = _split_traces_by_sign(frame.data)
-            new_frames.append(go.Frame(data=frame_traces, name=frame.name))
-        fig.frames = new_frames
-    else:
-        # Simple case: just apply bar-like styling
-        fig = base_fig
-        _apply_barlike_style(fig.data)
-        for frame in fig.frames:
-            _apply_barlike_style(frame.data)
+    _style_traces_as_bars(fig)
 
     return fig
 

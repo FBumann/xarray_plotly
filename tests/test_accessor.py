@@ -173,14 +173,25 @@ class TestDataArrayPxplot:
                 assert trace.line.shape == "hv"
                 assert trace.fillcolor is not None
 
-    def test_fast_bar_mixed_signs_separate_stacks(self) -> None:
-        """Test that fast_bar uses separate stackgroups for mixed positive/negative data."""
+    def test_fast_bar_mixed_signs_dashed(self) -> None:
+        """Test that fast_bar shows mixed-sign traces as dashed lines."""
         da = xr.DataArray(
-            np.array([[50, -30], [-40, 60]]),
+            np.array([[50, -30], [-40, 60]]),  # Both columns have mixed signs
             dims=["time", "category"],
         )
         fig = da.plotly.fast_bar()
-        # Should have separate positive and negative stackgroups
+        # Mixed traces should have no stacking and dashed lines
+        for trace in fig.data:
+            assert trace.stackgroup is None
+            assert trace.line.dash == "dash"
+
+    def test_fast_bar_separate_sign_columns(self) -> None:
+        """Test that fast_bar uses separate stackgroups when columns have different signs."""
+        da = xr.DataArray(
+            np.array([[50, -30], [60, -40]]),  # Column 0 positive, column 1 negative
+            dims=["time", "category"],
+        )
+        fig = da.plotly.fast_bar()
         stackgroups = {trace.stackgroup for trace in fig.data}
         assert "positive" in stackgroups
         assert "negative" in stackgroups
