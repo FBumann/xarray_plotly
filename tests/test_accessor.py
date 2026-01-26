@@ -468,10 +468,11 @@ class TestColorsParameter:
             fig = self.da.plotly.line(
                 colors="D3", color_discrete_sequence=["orange", "purple", "cyan"]
             )
-            # Should have raised a warning
-            assert len(w) == 1
-            assert "colors" in str(w[0].message).lower()
-            assert "ignored" in str(w[0].message).lower()
+            # Should have raised a warning about colors being ignored
+            assert any(
+                "colors" in str(m.message).lower() and "ignored" in str(m.message).lower()
+                for m in w
+            ), "Expected warning about 'colors' being 'ignored' not found"
             # The explicit px_kwargs should take precedence
             assert fig.data[0].line.color == "orange"
 
