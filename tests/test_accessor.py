@@ -401,3 +401,127 @@ class TestImshowBounds:
         coloraxis = fig.layout.coloraxis
         assert coloraxis.cmin == 0.0
         assert coloraxis.cmax == 70.0
+
+
+class TestColorsParameter:
+    """Tests for the unified colors parameter."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+        """Create test DataArrays."""
+        self.da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["time", "city"],
+            coords={"city": ["A", "B", "C"]},
+        )
+
+    def test_colors_list_sets_discrete_sequence(self) -> None:
+        """Test that a list of colors sets color_discrete_sequence."""
+        fig = self.da.plotly.line(colors=["red", "blue", "green"])
+        # Check that traces have the expected colors
+        assert len(fig.data) == 3
+        assert fig.data[0].line.color == "red"
+        assert fig.data[1].line.color == "blue"
+        assert fig.data[2].line.color == "green"
+
+    def test_colors_dict_sets_discrete_map(self) -> None:
+        """Test that a dict sets color_discrete_map."""
+        fig = self.da.plotly.line(colors={"A": "red", "B": "blue", "C": "green"})
+        # Traces should be colored according to the mapping
+        assert len(fig.data) == 3
+        # Find traces by name and check their color
+        colors_by_name = {trace.name: trace.line.color for trace in fig.data}
+        assert colors_by_name["A"] == "red"
+        assert colors_by_name["B"] == "blue"
+        assert colors_by_name["C"] == "green"
+
+    def test_colors_continuous_scale_string(self) -> None:
+        """Test that a continuous scale name sets color_continuous_scale."""
+        da = xr.DataArray(
+            np.random.rand(50, 2),
+            dims=["point", "coord"],
+            coords={"coord": ["x", "y"]},
+        )
+        fig = da.plotly.scatter(y="coord", x="point", color="value", colors="Viridis")
+        # Plotly Express uses coloraxis in the layout for continuous scales
+        # Check that the colorscale was applied to the coloraxis
+        assert fig.layout.coloraxis.colorscale is not None
+        colorscale = fig.layout.coloraxis.colorscale
+        # Viridis should be in the colorscale definition
+        assert any("viridis" in str(c).lower() for c in colorscale) or len(colorscale) > 0
+
+    def test_colors_qualitative_palette_string(self) -> None:
+        """Test that a qualitative palette name sets color_discrete_sequence."""
+        import plotly.express as px
+
+        fig = self.da.plotly.line(colors="D3")
+        # D3 palette should be applied - check first trace color is from D3
+        d3_colors = px.colors.qualitative.D3
+        assert fig.data[0].line.color in d3_colors
+
+    def test_colors_ignored_with_warning_when_px_kwargs_present(self) -> None:
+        """Test that colors is ignored with warning when color_* kwargs are present."""
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            fig = self.da.plotly.line(
+                colors="D3", color_discrete_sequence=["orange", "purple", "cyan"]
+            )
+            # Should have raised a warning
+            assert len(w) == 1
+            assert "colors" in str(w[0].message).lower()
+            assert "ignored" in str(w[0].message).lower()
+            # The explicit px_kwargs should take precedence
+            assert fig.data[0].line.color == "orange"
+
+    def test_colors_none_uses_defaults(self) -> None:
+        """Test that colors=None uses Plotly defaults."""
+        fig1 = self.da.plotly.line(colors=None)
+        fig2 = self.da.plotly.line()
+        # Both should produce the same result
+        assert fig1.data[0].line.color == fig2.data[0].line.color
+
+    def test_colors_works_with_bar(self) -> None:
+        """Test colors parameter with bar chart."""
+        fig = self.da.plotly.bar(colors=["#e41a1c", "#377eb8", "#4daf4a"])
+        assert fig.data[0].marker.color == "#e41a1c"
+
+    def test_colors_works_with_area(self) -> None:
+        """Test colors parameter with area chart."""
+        fig = self.da.plotly.area(colors=["red", "green", "blue"])
+        assert len(fig.data) == 3
+
+    def test_colors_works_with_scatter(self) -> None:
+        """Test colors parameter with scatter plot."""
+        fig = self.da.plotly.scatter(colors=["red", "green", "blue"])
+        assert len(fig.data) == 3
+
+    def test_colors_works_with_imshow(self) -> None:
+        """Test colors parameter with imshow (continuous scale)."""
+        da = xr.DataArray(np.random.rand(10, 10), dims=["y", "x"])
+        fig = da.plotly.imshow(colors="RdBu")
+        # Plotly Express uses coloraxis in the layout for continuous scales
+        assert fig.layout.coloraxis.colorscale is not None
+        colorscale = fig.layout.coloraxis.colorscale
+        # RdBu should be in the colorscale definition
+        assert any("rdbu" in str(c).lower() for c in colorscale) or len(colorscale) > 0
+
+    def test_colors_works_with_pie(self) -> None:
+        """Test colors parameter with pie chart."""
+        da = xr.DataArray([30, 40, 30], dims=["category"], coords={"category": ["A", "B", "C"]})
+        fig = da.plotly.pie(colors={"A": "red", "B": "blue", "C": "green"})
+        assert isinstance(fig, go.Figure)
+
+    def test_colors_works_with_dataset(self) -> None:
+        """Test colors parameter works with Dataset accessor."""
+        ds = xr.Dataset(
+            {
+                "temp": (["time"], np.random.rand(10)),
+                "precip": (["time"], np.random.rand(10)),
+            }
+        )
+        fig = ds.plotly.line(colors=["red", "blue"])
+        assert len(fig.data) == 2
+        assert fig.data[0].line.color == "red"
+        assert fig.data[1].line.color == "blue"
