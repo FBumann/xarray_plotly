@@ -42,6 +42,26 @@ fig = xpx(da).line()
 
 Full documentation: [https://fbumann.github.io/xarray_plotly](https://fbumann.github.io/xarray_plotly)
 
+## Roadmap
+
+Planned additions (contributions welcome):
+
+**New plot types**
+- `histogram()` — distribution of DataArray values
+- `violin()` — richer distribution visualization than box plots
+- `density_heatmap()` — 2D histograms (x and y as dimensions)
+- `density_contour()` — 2D density contours (x and y as dimensions)
+
+**Enhancements**
+- WebGL rendering option for `line()` and `scatter()` (large datasets)
+
+**Figure utilities** (facet/animation-aware)
+- `add_trace()` — add a trace to base figure and all animation frames
+- `fill_between()` — fill area between two traces (uncertainty bands)
+- `sync_axes()` — consistent axis ranges across facets and animation frames
+- `add_secondary_x()` — secondary x-axis (like `add_secondary_y()`)
+- `stack()` — vertically stack separate figures into subplots
+
 ## License
 
 MIT
