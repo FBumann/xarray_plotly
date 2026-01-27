@@ -17,3 +17,5 @@ jobs:
         with:
           release-type: simple
           package-name: xarray_plotly
+          # Keep version at 0.0.x - feat: bumps patch instead of minor
+          bump-patch-for-minor-pre-major: true
