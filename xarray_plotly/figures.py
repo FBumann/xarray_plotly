@@ -329,6 +329,9 @@ def add_secondary_y(
         trace_copy.yaxis = y_mapping[original_yaxis]
         combined.add_trace(trace_copy)
 
+    # Get the rightmost secondary y-axis name for linking
+    rightmost_secondary_y = y_mapping[rightmost_primary_y]
+
     # Configure secondary y-axes
     for primary_yaxis, secondary_yaxis in y_mapping.items():
         is_rightmost = primary_yaxis == rightmost_primary_y
@@ -350,6 +353,8 @@ def add_secondary_y(
             "anchor": x_for_y[primary_yaxis],
             # Only show ticks on the rightmost secondary axis
             "showticklabels": is_rightmost,
+            # Link non-rightmost axes to the rightmost for consistent scaling
+            "matches": None if is_rightmost else rightmost_secondary_y,
         }
         # Remove None values
         axis_config = {k: v for k, v in axis_config.items() if v is not None}
