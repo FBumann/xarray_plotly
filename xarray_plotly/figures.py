@@ -308,6 +308,13 @@ def add_secondary_y(
     # Build mapping from primary y-axes to secondary y-axes
     y_mapping = _build_secondary_y_mapping(base_axes)
 
+    # Build x-y correspondence from base_axes (which x-axis pairs with which y-axis)
+    x_for_y = {yaxis: xaxis for xaxis, yaxis in base_axes}
+
+    # Find the rightmost x-axis (highest number) to determine which secondary axis shows ticks
+    rightmost_x = max(x_for_y.values(), key=lambda x: int(x[1:]) if x != "x" else 1)
+    rightmost_primary_y = next(y for y, x in x_for_y.items() if x == rightmost_x)
+
     # Create new figure with base's layout
     combined = go.Figure(layout=copy.deepcopy(base.layout))
 
@@ -324,22 +331,25 @@ def add_secondary_y(
 
     # Configure secondary y-axes
     for primary_yaxis, secondary_yaxis in y_mapping.items():
-        # Get title - only set on first secondary axis or use provided title
+        is_rightmost = primary_yaxis == rightmost_primary_y
+
+        # Get title - only set on rightmost secondary axis
         title = None
-        if secondary_y_title is not None:
-            # Only set title on the first secondary axis to avoid repetition
-            if primary_yaxis == "y":
+        if is_rightmost:
+            if secondary_y_title is not None:
                 title = secondary_y_title
-        elif primary_yaxis == "y" and secondary.layout.yaxis and secondary.layout.yaxis.title:
-            # Try to get from secondary's layout
-            title = secondary.layout.yaxis.title.text
+            elif secondary.layout.yaxis and secondary.layout.yaxis.title:
+                title = secondary.layout.yaxis.title.text
 
         # Configure the secondary axis
+        # Anchor to the corresponding x-axis so it appears on the right side of its subplot
         axis_config = {
             "title": title,
             "overlaying": primary_yaxis,
             "side": "right",
-            "anchor": "free" if primary_yaxis != "y" else None,
+            "anchor": x_for_y[primary_yaxis],
+            # Only show ticks on the rightmost secondary axis
+            "showticklabels": is_rightmost,
         }
         # Remove None values
         axis_config = {k: v for k, v in axis_config.items() if v is not None}

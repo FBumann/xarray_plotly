@@ -505,8 +505,8 @@ class TestAddSecondaryYFacets:
 
         combined = add_secondary_y(base, secondary, secondary_y_title="Custom Title")
 
-        # Title should be on the first secondary axis
-        assert combined.layout.yaxis4.title.text == "Custom Title"
+        # Title should be on the rightmost secondary axis (yaxis6 for 3 facets)
+        assert combined.layout.yaxis6.title.text == "Custom Title"
 
 
 class TestAddSecondaryYAnimation:
