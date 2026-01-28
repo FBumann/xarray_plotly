@@ -1,9 +1,11 @@
-name: Release
+name: Release (Manual)
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.0.13)'
+        required: true
 
 jobs:
   release:
@@ -13,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
