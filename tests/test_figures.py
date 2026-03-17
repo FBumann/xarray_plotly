@@ -820,7 +820,7 @@ class TestSubplotsTitles:
         fig2 = xpx(da).bar(title="Other Title")
         grid = subplots(fig1, fig2, cols=2)
         titles = [ann.text for ann in grid.layout.annotations]
-        assert titles == ["My Title", "Other Title"]
+        assert titles == ["<b>My Title</b>", "<b>Other Title</b>"]
 
     def test_titles_from_yaxis_label(self) -> None:
         da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
@@ -829,7 +829,7 @@ class TestSubplotsTitles:
         fig2 = xpx(da2).line()
         grid = subplots(fig1, fig2, cols=2)
         titles = [ann.text for ann in grid.layout.annotations]
-        assert titles == ["Temperature", "Pressure"]
+        assert titles == ["<b>Temperature</b>", "<b>Pressure</b>"]
 
     def test_titles_fallback_empty(self) -> None:
         grid = subplots(go.Figure(), go.Figure(), cols=2)
@@ -860,15 +860,21 @@ class TestSubplotsValidation:
         with pytest.raises(ValueError, match="cols must be >= 1"):
             subplots(go.Figure(), cols=0)
 
-    def test_faceted_figure_raises(self) -> None:
+    def test_faceted_figures_stacked(self) -> None:
+        """Faceted figures can be stacked in a subplot grid."""
         da = xr.DataArray(
             np.random.rand(10, 3),
             dims=["x", "facet"],
             coords={"facet": ["A", "B", "C"]},
         )
-        fig = xpx(da).line(facet_col="facet")
-        with pytest.raises(ValueError, match="internal subplots"):
-            subplots(fig)
+        fig1 = xpx(da).bar(facet_col="facet")
+        fig2 = xpx(da).line(facet_col="facet")
+        grid = subplots(fig1, fig2, cols=1)
+        # 3 bar traces + 3 line traces
+        assert len(grid.data) == 6
+        # All traces should have unique axis assignments
+        axes = {(t.xaxis, t.yaxis) for t in grid.data}
+        assert len(axes) == 6
 
     def test_animated_figure_raises(self) -> None:
         da = xr.DataArray(np.random.rand(10, 3), dims=["x", "time"])

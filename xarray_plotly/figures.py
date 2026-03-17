@@ -624,7 +624,9 @@ def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
     """Arrange multiple figures into a subplot grid.
 
     Creates a new figure with each input figure placed in its own cell.
-    Subplot titles are derived from each figure's title or y-axis label.
+    Figures may contain internal subplots (facets) — their axes are remapped
+    to fit within the grid cell.  Subplot titles are derived from each
+    figure's title or y-axis label.
 
     Args:
         *figs: One or more Plotly figures to arrange.
@@ -635,7 +637,7 @@ def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
 
     Raises:
         ValueError: If no figures are provided, cols < 1, or a figure has
-            internal subplots (facets) or animation frames.
+            animation frames.
 
     Example:
         >>> import numpy as np
@@ -650,21 +652,14 @@ def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
     """
     import math
 
-    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go
 
     if not figs:
         raise ValueError("At least one figure is required.")
     if cols < 1:
         raise ValueError(f"cols must be >= 1, got {cols}.")
 
-    # Validate inputs
     for i, fig in enumerate(figs):
-        axes = _get_subplot_axes(fig)
-        if len(axes) > 1:
-            raise ValueError(
-                f"Figure at position {i} has internal subplots (facets). "
-                "Use single-panel figures with subplots()."
-            )
         if fig.frames:
             raise ValueError(
                 f"Figure at position {i} has animation frames. "
@@ -672,26 +667,57 @@ def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
             )
 
     rows = math.ceil(len(figs) / cols)
+    combined = go.Figure()
 
-    # Derive subplot titles
-    titles = [_get_figure_title(f) for f in figs]
-    # Pad for empty trailing cells
-    titles.extend("" for _ in range(rows * cols - len(figs)))
+    # Grid spacing
+    h_gap = 0.05
+    v_gap = 0.08
+    cell_w = (1.0 - h_gap * (cols - 1)) / cols
+    cell_h = (1.0 - v_gap * (rows - 1)) / rows
 
-    grid = make_subplots(rows=rows, cols=cols, subplot_titles=titles)
+    next_x_num = 1
+    next_y_num = 1
 
-    # Add traces from each figure to the correct cell
     for i, fig in enumerate(figs):
-        row = i // cols + 1
-        col = i % cols + 1
+        row = i // cols  # 0-indexed, top to bottom
+        col = i % cols
 
+        # Cell boundaries (clamped to [0, 1])
+        cell_x0 = max(0.0, col * (cell_w + h_gap))
+        cell_x1 = min(1.0, cell_x0 + cell_w)
+        cell_y1 = min(1.0, 1.0 - row * (cell_h + v_gap))  # top-down
+        cell_y0 = max(0.0, cell_y1 - cell_h)
+
+        # Build axis remapping: old axis ref → new axis ref
+        axis_map, next_x_num, next_y_num = _remap_figure_axes(
+            fig, combined, next_x_num, next_y_num, cell_x0, cell_x1, cell_y0, cell_y1
+        )
+
+        # Add traces with remapped axis refs
         for trace in fig.data:
-            grid.add_trace(copy.deepcopy(trace), row=row, col=col)
+            tc = copy.deepcopy(trace)
+            old_x = getattr(tc, "xaxis", None) or "x"
+            old_y = getattr(tc, "yaxis", None) or "y"
+            tc.xaxis = axis_map[old_x]["new_x"]
+            tc.yaxis = axis_map[old_y]["new_y"]
+            combined.add_trace(tc)
 
-        # Copy axis config from source figure to target cell
-        _copy_axis_config(fig, grid, row, col)
+        # Add subplot title as annotation
+        title = _get_figure_title(fig)
+        if title:
+            combined.add_annotation(
+                text=f"<b>{title}</b>",
+                x=(cell_x0 + cell_x1) / 2,
+                y=cell_y1,
+                xref="paper",
+                yref="paper",
+                xanchor="center",
+                yanchor="bottom",
+                showarrow=False,
+                font={"size": 14},
+            )
 
-    return grid
+    return combined
 
 
 # Axis properties safe to copy between figures (display-only, not structural).
@@ -712,37 +738,132 @@ _AXIS_PROPS_TO_COPY = (
     "zeroline",
     "zerolinecolor",
     "zerolinewidth",
+    "showticklabels",
 )
 
 
-def _copy_axis_config(src: go.Figure, grid: go.Figure, row: int, col: int) -> None:
-    """Copy display-related axis properties from a source figure to a grid cell.
+def _axis_layout_key(ref: str) -> str:
+    """Convert axis reference to layout property name.
+
+    ``"x"`` → ``"xaxis"``, ``"x2"`` → ``"xaxis2"``,
+    ``"y"`` → ``"yaxis"``, ``"y3"`` → ``"yaxis3"``.
+    """
+    if ref in ("x", "y"):
+        return f"{ref}axis"
+    prefix = ref[0]  # "x" or "y"
+    num = ref[1:]
+    return f"{prefix}axis{num}"
+
+
+def _new_axis_ref(prefix: str, num: int) -> str:
+    """Build an axis reference string. ``_new_axis_ref("x", 1)`` → ``"x"``, ``("x", 3)`` → ``"x3"``."""
+    return prefix if num == 1 else f"{prefix}{num}"
+
+
+def _remap_figure_axes(
+    fig: go.Figure,
+    combined: go.Figure,
+    next_x_num: int,
+    next_y_num: int,
+    cell_x0: float,
+    cell_x1: float,
+    cell_y0: float,
+    cell_y1: float,
+) -> tuple[dict[str, dict[str, str]], int, int]:
+    """Remap a figure's axes into a grid cell, adding axis configs to the combined layout.
 
     Args:
-        src: Source figure whose axis config to copy.
-        grid: Target subplot grid figure.
-        row: Target row (1-indexed).
-        col: Target column (1-indexed).
+        fig: Source figure.
+        combined: Target combined figure (mutated — axis configs added to layout).
+        next_x_num: Next available x-axis number.
+        next_y_num: Next available y-axis number.
+        cell_x0, cell_x1: Horizontal cell bounds in paper coordinates.
+        cell_y0, cell_y1: Vertical cell bounds in paper coordinates.
+
+    Returns:
+        Tuple of (axis_map, next_x_num, next_y_num).
+        axis_map maps old axis refs to ``{"new_x": ...}`` or ``{"new_y": ...}``.
     """
-    # Get the xaxis/yaxis objects for the target cell
-    xref, yref = grid.get_subplot(row, col)
+    cell_w = cell_x1 - cell_x0
+    cell_h = cell_y1 - cell_y0
+    src_layout = fig.layout.to_plotly_json()
 
-    # Convert plotly axis objects to layout property names
-    # xref.plotly_name is e.g. "xaxis" or "xaxis2"
-    x_layout_key = xref.plotly_name
-    y_layout_key = yref.plotly_name
+    x_remap: dict[str, str] = {}
+    y_remap: dict[str, str] = {}
 
-    src_xaxis = src.layout.xaxis or {}
-    src_yaxis = src.layout.yaxis or {}
+    # Get all unique axis refs
+    x_refs: set[str] = set()
+    y_refs: set[str] = set()
+    for trace in fig.data:
+        x_refs.add(getattr(trace, "xaxis", None) or "x")
+        y_refs.add(getattr(trace, "yaxis", None) or "y")
 
-    for prop in _AXIS_PROPS_TO_COPY:
-        xval = getattr(src_xaxis, prop, None)
-        if xval is not None:
-            grid.layout[x_layout_key][prop] = xval
+    # Remap x-axes
+    for old_xref in sorted(x_refs, key=lambda r: int(r[1:]) if len(r) > 1 else 1):
+        new_xref = _new_axis_ref("x", next_x_num)
+        x_remap[old_xref] = new_xref
 
-        yval = getattr(src_yaxis, prop, None)
-        if yval is not None:
-            grid.layout[y_layout_key][prop] = yval
+        src_config = src_layout.get(_axis_layout_key(old_xref), {})
+        src_domain = src_config.get("domain", [0.0, 1.0])
+        new_domain = [
+            max(0.0, cell_x0 + src_domain[0] * cell_w),
+            min(1.0, cell_x0 + src_domain[1] * cell_w),
+        ]
+
+        new_config: dict[str, Any] = {"domain": new_domain}
+        for prop in _AXIS_PROPS_TO_COPY:
+            if prop in src_config:
+                new_config[prop] = src_config[prop]
+
+        combined.layout[_axis_layout_key(new_xref)] = new_config
+        next_x_num += 1
+
+    # Remap y-axes
+    for old_yref in sorted(y_refs, key=lambda r: int(r[1:]) if len(r) > 1 else 1):
+        new_yref = _new_axis_ref("y", next_y_num)
+        y_remap[old_yref] = new_yref
+
+        src_config = src_layout.get(_axis_layout_key(old_yref), {})
+        src_domain = src_config.get("domain", [0.0, 1.0])
+        new_domain = [
+            max(0.0, cell_y0 + src_domain[0] * cell_h),
+            min(1.0, cell_y0 + src_domain[1] * cell_h),
+        ]
+
+        new_config = {"domain": new_domain}
+        for prop in _AXIS_PROPS_TO_COPY:
+            if prop in src_config:
+                new_config[prop] = src_config[prop]
+
+        combined.layout[_axis_layout_key(new_yref)] = new_config
+        next_y_num += 1
+
+    # Set anchors between paired axes
+    for trace in fig.data:
+        old_x = getattr(trace, "xaxis", None) or "x"
+        old_y = getattr(trace, "yaxis", None) or "y"
+        combined.layout[_axis_layout_key(x_remap[old_x])]["anchor"] = y_remap[old_y]
+        combined.layout[_axis_layout_key(y_remap[old_y])]["anchor"] = x_remap[old_x]
+
+    # Propagate matches relationships
+    for old_ref, new_ref in x_remap.items():
+        src_config = src_layout.get(_axis_layout_key(old_ref), {})
+        if "matches" in src_config and src_config["matches"] in x_remap:
+            combined.layout[_axis_layout_key(new_ref)]["matches"] = x_remap[src_config["matches"]]
+
+    for old_ref, new_ref in y_remap.items():
+        src_config = src_layout.get(_axis_layout_key(old_ref), {})
+        if "matches" in src_config and src_config["matches"] in y_remap:
+            combined.layout[_axis_layout_key(new_ref)]["matches"] = y_remap[src_config["matches"]]
+
+    # Build combined return mapping
+    result: dict[str, dict[str, str]] = {}
+    for old_x, new_x in x_remap.items():
+        result[old_x] = {"new_x": new_x}
+    for old_y, new_y in y_remap.items():
+        result[old_y] = {"new_y": new_y}
+
+    return result, next_x_num, next_y_num
 
 
 def update_traces(
