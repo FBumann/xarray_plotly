@@ -1,4 +1,4 @@
-"""Tests for the figures module (overlay, add_secondary_y)."""
+"""Tests for the figures module (overlay, add_secondary_y, subplots)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import pytest
 import xarray as xr
 
-from xarray_plotly import add_secondary_y, overlay, xpx
+from xarray_plotly import add_secondary_y, overlay, subplots, xpx
 
 
 class TestOverlayBasic:
@@ -755,3 +755,130 @@ class TestLegendVisibility:
             assert frame.data[0].marker.color == "steelblue"
             # Line trace should keep red
             assert frame.data[1].line.color == "red"
+
+
+class TestSubplotsBasic:
+    """Basic tests for subplots function."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+        self.da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        self.da2 = xr.DataArray([10, 20, 30], dims=["x"], name="Rainfall")
+        self.da3 = xr.DataArray([100, 200, 300], dims=["x"], name="Wind")
+
+    def test_single_figure(self) -> None:
+        fig = xpx(self.da1).line()
+        grid = subplots(fig)
+        assert len(grid.data) == 1
+
+    def test_two_figures_one_column(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        grid = subplots(fig1, fig2, cols=1)
+        assert len(grid.data) == 2
+        # Should be on different y-axes (different rows)
+        assert grid.data[0].yaxis != grid.data[1].yaxis
+
+    def test_two_figures_two_columns(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == 2
+        assert grid.data[0].xaxis != grid.data[1].xaxis
+
+    def test_three_figures_two_columns(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        fig3 = xpx(self.da3).scatter()
+        grid = subplots(fig1, fig2, fig3, cols=2)
+        assert len(grid.data) == 3
+
+    def test_trace_count_preserved(self) -> None:
+        da_multi = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["A", "B", "C"]},
+        )
+        fig1 = xpx(da_multi).line()  # 3 traces
+        fig2 = xpx(self.da1).bar()  # 1 trace
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == len(fig1.data) + len(fig2.data)
+
+    def test_with_empty_figure(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = go.Figure()
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == 1
+
+
+class TestSubplotsTitles:
+    """Tests for subplot title derivation."""
+
+    def test_titles_from_figure_title(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["x"], name="val")
+        fig1 = xpx(da).line(title="My Title")
+        fig2 = xpx(da).bar(title="Other Title")
+        grid = subplots(fig1, fig2, cols=2)
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == ["My Title", "Other Title"]
+
+    def test_titles_from_yaxis_label(self) -> None:
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="Pressure")
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+        grid = subplots(fig1, fig2, cols=2)
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == ["Temperature", "Pressure"]
+
+    def test_titles_fallback_empty(self) -> None:
+        grid = subplots(go.Figure(), go.Figure(), cols=2)
+        # make_subplots omits annotations for empty titles
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == []
+
+
+class TestSubplotsAxisConfig:
+    """Tests for axis configuration copying."""
+
+    def test_axis_titles_copied(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["time"], name="Temperature")
+        fig = xpx(da).line()
+        grid = subplots(fig)
+        assert grid.layout.yaxis.title.text == "Temperature"
+        assert grid.layout.xaxis.title.text == "time"
+
+
+class TestSubplotsValidation:
+    """Tests for subplots input validation."""
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(ValueError, match="At least one figure"):
+            subplots()
+
+    def test_invalid_cols_raises(self) -> None:
+        with pytest.raises(ValueError, match="cols must be >= 1"):
+            subplots(go.Figure(), cols=0)
+
+    def test_faceted_figure_raises(self) -> None:
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "facet"],
+            coords={"facet": ["A", "B", "C"]},
+        )
+        fig = xpx(da).line(facet_col="facet")
+        with pytest.raises(ValueError, match="internal subplots"):
+            subplots(fig)
+
+    def test_animated_figure_raises(self) -> None:
+        da = xr.DataArray(np.random.rand(10, 3), dims=["x", "time"])
+        fig = xpx(da).line(animation_frame="time")
+        with pytest.raises(ValueError, match="animation frames"):
+            subplots(fig)
+
+    def test_source_not_modified(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["x"], name="val")
+        fig = xpx(da).line()
+        original_count = len(fig.data)
+        _ = subplots(fig, fig, cols=2)
+        assert len(fig.data) == original_count

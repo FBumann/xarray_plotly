@@ -600,6 +600,151 @@ def _merge_secondary_y_frames(
     return merged_frames
 
 
+def _get_figure_title(fig: go.Figure) -> str:
+    """Extract a display title from a figure for use as a subplot title.
+
+    Checks, in order: the figure's title, then the y-axis title.
+
+    Args:
+        fig: A Plotly figure.
+
+    Returns:
+        A title string, or empty string if nothing is set.
+    """
+    try:
+        title = fig.layout.title.text
+        if title:
+            return title
+    except AttributeError:
+        pass
+    return _get_yaxis_title(fig)
+
+
+def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
+    """Arrange multiple figures into a subplot grid.
+
+    Creates a new figure with each input figure placed in its own cell.
+    Subplot titles are derived from each figure's title or y-axis label.
+
+    Args:
+        *figs: One or more Plotly figures to arrange.
+        cols: Number of columns in the grid. Rows are computed automatically.
+
+    Returns:
+        A new figure with subplot grid.
+
+    Raises:
+        ValueError: If no figures are provided, cols < 1, or a figure has
+            internal subplots (facets) or animation frames.
+
+    Example:
+        >>> import numpy as np
+        >>> import xarray as xr
+        >>> from xarray_plotly import xpx, subplots
+        >>>
+        >>> temp = xr.DataArray([20, 22, 25], dims=["time"], name="Temperature")
+        >>> rain = xr.DataArray([0, 5, 12], dims=["time"], name="Rainfall")
+        >>> fig1 = xpx(temp).line()
+        >>> fig2 = xpx(rain).bar()
+        >>> grid = subplots(fig1, fig2, cols=2)
+    """
+    import math
+
+    from plotly.subplots import make_subplots
+
+    if not figs:
+        raise ValueError("At least one figure is required.")
+    if cols < 1:
+        raise ValueError(f"cols must be >= 1, got {cols}.")
+
+    # Validate inputs
+    for i, fig in enumerate(figs):
+        axes = _get_subplot_axes(fig)
+        if len(axes) > 1:
+            raise ValueError(
+                f"Figure at position {i} has internal subplots (facets). "
+                "Use single-panel figures with subplots()."
+            )
+        if fig.frames:
+            raise ValueError(
+                f"Figure at position {i} has animation frames. "
+                "Animated figures are not supported in subplots()."
+            )
+
+    rows = math.ceil(len(figs) / cols)
+
+    # Derive subplot titles
+    titles = [_get_figure_title(f) for f in figs]
+    # Pad for empty trailing cells
+    titles.extend("" for _ in range(rows * cols - len(figs)))
+
+    grid = make_subplots(rows=rows, cols=cols, subplot_titles=titles)
+
+    # Add traces from each figure to the correct cell
+    for i, fig in enumerate(figs):
+        row = i // cols + 1
+        col = i % cols + 1
+
+        for trace in fig.data:
+            grid.add_trace(copy.deepcopy(trace), row=row, col=col)
+
+        # Copy axis config from source figure to target cell
+        _copy_axis_config(fig, grid, row, col)
+
+    return grid
+
+
+# Axis properties safe to copy between figures (display-only, not structural).
+_AXIS_PROPS_TO_COPY = (
+    "title",
+    "type",
+    "tickformat",
+    "ticksuffix",
+    "tickprefix",
+    "dtick",
+    "tick0",
+    "nticks",
+    "showgrid",
+    "gridcolor",
+    "gridwidth",
+    "autorange",
+    "range",
+    "zeroline",
+    "zerolinecolor",
+    "zerolinewidth",
+)
+
+
+def _copy_axis_config(src: go.Figure, grid: go.Figure, row: int, col: int) -> None:
+    """Copy display-related axis properties from a source figure to a grid cell.
+
+    Args:
+        src: Source figure whose axis config to copy.
+        grid: Target subplot grid figure.
+        row: Target row (1-indexed).
+        col: Target column (1-indexed).
+    """
+    # Get the xaxis/yaxis objects for the target cell
+    xref, yref = grid.get_subplot(row, col)
+
+    # Convert plotly axis objects to layout property names
+    # xref.plotly_name is e.g. "xaxis" or "xaxis2"
+    x_layout_key = xref.plotly_name
+    y_layout_key = yref.plotly_name
+
+    src_xaxis = src.layout.xaxis or {}
+    src_yaxis = src.layout.yaxis or {}
+
+    for prop in _AXIS_PROPS_TO_COPY:
+        xval = getattr(src_xaxis, prop, None)
+        if xval is not None:
+            grid.layout[x_layout_key][prop] = xval
+
+        yval = getattr(src_yaxis, prop, None)
+        if yval is not None:
+            grid.layout[y_layout_key][prop] = yval
+
+
 def update_traces(
     fig: go.Figure, selector: dict[str, Any] | None = None, **kwargs: Any
 ) -> go.Figure:

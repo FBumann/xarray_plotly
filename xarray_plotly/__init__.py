@@ -56,6 +56,7 @@ from xarray_plotly.common import SLOT_ORDERS, Colors, auto
 from xarray_plotly.figures import (
     add_secondary_y,
     overlay,
+    subplots,
     update_traces,
 )
 
@@ -66,6 +67,7 @@ __all__ = [
     "auto",
     "config",
     "overlay",
+    "subplots",
     "update_traces",
     "xpx",
 ]
