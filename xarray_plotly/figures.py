@@ -13,6 +13,188 @@ if TYPE_CHECKING:
     import plotly.graph_objects as go
 
 
+def _get_yaxis_title(fig: go.Figure) -> str:
+    """Extract the primary y-axis title text from a figure.
+
+    Args:
+        fig: A Plotly figure.
+
+    Returns:
+        The y-axis title text, or empty string if not set.
+    """
+    try:
+        return fig.layout.yaxis.title.text or ""
+    except AttributeError:
+        return ""
+
+
+def _ensure_legend_visibility(
+    combined: go.Figure,
+    source_figs: list[go.Figure],
+    trace_slices: list[slice],
+) -> None:
+    """Fix legend visibility on a combined figure.
+
+    Handles three problems that arise when combining Plotly Express figures:
+
+    1. **Unnamed traces** — PX sets ``name=""`` on single-trace (no color)
+       figures.  We derive a name from each source figure's y-axis title.
+    2. **Hidden named traces** — PX sets ``showlegend=False`` on single-trace
+       figures.  We ensure at least one trace per ``legendgroup`` (or each
+       ungrouped named trace) has ``showlegend=True``.
+    3. **Duplicate legend entries** — when two source figures share the same
+       ``legendgroup`` names, we deduplicate so only the first trace per
+       group shows in the legend.
+
+    Args:
+        combined: The combined Plotly figure (mutated in place).
+        source_figs: The original source figures, in trace order.
+        trace_slices: Slices into ``combined.data`` for each source figure.
+    """
+    from collections import defaultdict
+
+    # --- Step 1: label unnamed traces from source y-axis titles -----------
+    labels = [_get_yaxis_title(f) for f in source_figs]
+
+    # If all labels are non-empty and identical, disambiguate
+    unique_labels = {lb for lb in labels if lb}
+    if len(unique_labels) == 1 and all(lb for lb in labels):
+        labels = [f"{labels[0]} ({i + 1})" for i in range(len(labels))]
+
+    for label, sl in zip(labels, trace_slices, strict=False):
+        if not label:
+            continue
+        for trace in combined.data[sl]:
+            if not getattr(trace, "name", None):
+                trace.name = label
+                trace.legendgroup = label
+
+    # --- Step 2 & 3: fix showlegend per legendgroup -----------------------
+    grouped: dict[str, list[Any]] = defaultdict(list)
+    ungrouped: list[Any] = []
+
+    for trace in combined.data:
+        lg = getattr(trace, "legendgroup", None) or ""
+        if lg:
+            grouped[lg].append(trace)
+        else:
+            ungrouped.append(trace)
+
+    for traces in grouped.values():
+        has_visible = False
+        for t in traces:
+            if has_visible:
+                # Deduplicate: only first keeps showlegend
+                t.showlegend = False
+            elif getattr(t, "name", None):
+                t.showlegend = True
+                has_visible = True
+
+    # Ungrouped traces with a name should show in the legend
+    for trace in ungrouped:
+        if getattr(trace, "name", None):
+            trace.showlegend = True
+
+    # --- Step 4: propagate style properties to animation frame traces ------
+    # When Plotly animates, frame trace data overwrites fig.data properties.
+    # PX frame traces carry name="", showlegend=False and default colors,
+    # discarding any styling the user applied via update_traces() before
+    # combining.  Propagate display properties from fig.data into every frame.
+    _STYLE_ATTRS = ("name", "legendgroup", "showlegend", "marker", "line", "opacity")
+    for frame in combined.frames or []:
+        for i, frame_trace in enumerate(frame.data):
+            if i < len(combined.data):
+                src = combined.data[i]
+                for attr in _STYLE_ATTRS:
+                    src_val = getattr(src, attr, None)
+                    if src_val is not None:
+                        setattr(frame_trace, attr, src_val)
+
+
+def _fix_animation_axis_ranges(fig: go.Figure) -> None:
+    """Set axis ranges to encompass data across all animation frames.
+
+    Plotly.js computes autorange from ``fig.data`` only and does not
+    recalculate during animation.  When different frames have very different
+    data ranges (e.g. population of Brazil vs China), values can go off-screen.
+    This function computes the global min/max for each axis across all frames
+    and sets explicit ranges on the layout.
+
+    Only numeric axes are handled; categorical/date axes are left to autorange.
+
+    Args:
+        fig: A Plotly figure with animation frames (mutated in place).
+    """
+    import numpy as np
+
+    if not fig.frames:
+        return
+
+    from collections import defaultdict
+
+    # Collect numeric y-values per axis across all traces (fig.data + frames)
+    y_by_axis: dict[str, list[float]] = defaultdict(list)
+    x_by_axis: dict[str, list[float]] = defaultdict(list)
+
+    # Track which axes have bar traces (for zero-baseline clamping)
+    y_has_vbar: set[str] = set()  # vertical bars → y-axis includes 0
+    x_has_hbar: set[str] = set()  # horizontal bars → x-axis includes 0
+
+    for trace in _iter_all_traces(fig):
+        yaxis = getattr(trace, "yaxis", None) or "y"
+        xaxis = getattr(trace, "xaxis", None) or "x"
+
+        # Track bar orientations
+        if getattr(trace, "type", None) == "bar":
+            orientation = getattr(trace, "orientation", None) or "v"
+            if orientation == "h":
+                x_has_hbar.add(xaxis)
+            else:
+                y_has_vbar.add(yaxis)
+
+        for data_attr, axis_ref, by_axis in [
+            ("y", yaxis, y_by_axis),
+            ("x", xaxis, x_by_axis),
+        ]:
+            vals = getattr(trace, data_attr, None)
+            if vals is None:
+                continue
+            arr = np.asarray(vals)
+            # Skip datetime/timedelta — leave those axes on autorange
+            if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
+                continue
+            try:
+                arr = arr.astype(float)
+                finite = arr[np.isfinite(arr)]
+                if len(finite):
+                    by_axis[axis_ref].extend(finite.tolist())
+            except (ValueError, TypeError):
+                pass  # Non-numeric (categorical) — skip
+
+    # Apply ranges to layout
+    for axis_ref, values in y_by_axis.items():
+        if not values:
+            continue
+        lo, hi = min(values), max(values)
+        if axis_ref in y_has_vbar:
+            lo = min(lo, 0.0)
+            hi = max(hi, 0.0)
+        pad = (hi - lo) * 0.05 or 1  # 5% padding
+        layout_prop = "yaxis" if axis_ref == "y" else f"yaxis{axis_ref[1:]}"
+        fig.layout[layout_prop].range = [lo - pad, hi + pad]
+
+    for axis_ref, values in x_by_axis.items():
+        if not values:
+            continue
+        lo, hi = min(values), max(values)
+        if axis_ref in x_has_hbar:
+            lo = min(lo, 0.0)
+            hi = max(hi, 0.0)
+        pad = (hi - lo) * 0.05 or 1
+        layout_prop = "xaxis" if axis_ref == "x" else f"xaxis{axis_ref[1:]}"
+        fig.layout[layout_prop].range = [lo - pad, hi + pad]
+
+
 def _iter_all_traces(fig: go.Figure) -> Iterator[Any]:
     """Iterate over all traces in a figure, including animation frames.
 
@@ -194,17 +376,11 @@ def overlay(base: go.Figure, *overlays: go.Figure) -> go.Figure:
         _validate_compatible_structure(base, overlay)
         _validate_animation_compatibility(base, overlay)
 
-    # Create new figure with base's layout
-    combined = go.Figure(layout=copy.deepcopy(base.layout))
-
-    # Add all traces from base
-    for trace in base.data:
-        combined.add_trace(copy.deepcopy(trace))
-
-    # Add all traces from overlays
+    # Create new figure with base's layout and all traces
+    all_traces = [copy.deepcopy(t) for t in base.data]
     for overlay in overlays:
-        for trace in overlay.data:
-            combined.add_trace(copy.deepcopy(trace))
+        all_traces.extend(copy.deepcopy(t) for t in overlay.data)
+    combined = go.Figure(data=all_traces, layout=copy.deepcopy(base.layout))
 
     # Handle animation frames
     if base.frames:
@@ -213,6 +389,17 @@ def overlay(base: go.Figure, *overlays: go.Figure) -> go.Figure:
         merged_frames = _merge_frames(base, list(overlays), base_trace_count, overlay_trace_counts)
         combined.frames = merged_frames
 
+    # Build trace slices for legend fix
+    source_figs = [base, *overlays]
+    slices: list[slice] = []
+    offset = 0
+    for fig in source_figs:
+        n = len(fig.data)
+        slices.append(slice(offset, offset + n))
+        offset += n
+
+    _ensure_legend_visibility(combined, source_figs, slices)
+    _fix_animation_axis_ranges(combined)
     return combined
 
 
@@ -315,19 +502,15 @@ def add_secondary_y(
     rightmost_x = max(x_for_y.values(), key=lambda x: int(x[1:]) if x != "x" else 1)
     rightmost_primary_y = next(y for y, x in x_for_y.items() if x == rightmost_x)
 
-    # Create new figure with base's layout
-    combined = go.Figure(layout=copy.deepcopy(base.layout))
-
-    # Add all traces from base (primary y-axis)
-    for trace in base.data:
-        combined.add_trace(copy.deepcopy(trace))
-
-    # Add all traces from secondary, remapped to secondary y-axes
+    # Build all traces: base (primary) + secondary (remapped to secondary y-axes)
+    all_traces = [copy.deepcopy(t) for t in base.data]
     for trace in secondary.data:
         trace_copy = copy.deepcopy(trace)
         original_yaxis = getattr(trace_copy, "yaxis", None) or "y"
         trace_copy.yaxis = y_mapping[original_yaxis]
-        combined.add_trace(trace_copy)
+        all_traces.append(trace_copy)
+
+    combined = go.Figure(data=all_traces, layout=copy.deepcopy(base.layout))
 
     # Get the rightmost secondary y-axis name for linking
     rightmost_secondary_y = y_mapping[rightmost_primary_y]
@@ -368,6 +551,14 @@ def add_secondary_y(
         merged_frames = _merge_secondary_y_frames(base, secondary, y_mapping)
         combined.frames = merged_frames
 
+    base_n = len(base.data)
+    sec_n = len(secondary.data)
+    _ensure_legend_visibility(
+        combined,
+        [base, secondary],
+        [slice(0, base_n), slice(base_n, base_n + sec_n)],
+    )
+    _fix_animation_axis_ranges(combined)
     return combined
 
 
@@ -424,6 +615,272 @@ def _merge_secondary_y_frames(
         )
 
     return merged_frames
+
+
+def _get_figure_title(fig: go.Figure) -> str:
+    """Extract a display title from a figure for use as a subplot title.
+
+    Checks, in order: the figure's title, then the y-axis title.
+
+    Args:
+        fig: A Plotly figure.
+
+    Returns:
+        A title string, or empty string if nothing is set.
+    """
+    try:
+        title = fig.layout.title.text
+        if isinstance(title, str) and title:
+            return title
+    except AttributeError:
+        pass
+    return _get_yaxis_title(fig)
+
+
+def subplots(*figs: go.Figure, cols: int = 1) -> go.Figure:
+    """Arrange multiple figures into a subplot grid.
+
+    Creates a new figure with each input figure placed in its own cell.
+    Figures may contain internal subplots (facets) — their axes are remapped
+    to fit within the grid cell.  Subplot titles are derived from each
+    figure's title or y-axis label.
+
+    Args:
+        *figs: One or more Plotly figures to arrange.
+        cols: Number of columns in the grid. Rows are computed automatically.
+
+    Returns:
+        A new figure with subplot grid.
+
+    Raises:
+        ValueError: If no figures are provided, cols < 1, or a figure has
+            animation frames.
+
+    Example:
+        >>> import numpy as np
+        >>> import xarray as xr
+        >>> from xarray_plotly import xpx, subplots
+        >>>
+        >>> temp = xr.DataArray([20, 22, 25], dims=["time"], name="Temperature")
+        >>> rain = xr.DataArray([0, 5, 12], dims=["time"], name="Rainfall")
+        >>> fig1 = xpx(temp).line()
+        >>> fig2 = xpx(rain).bar()
+        >>> grid = subplots(fig1, fig2, cols=2)
+    """
+    import math
+
+    import plotly.graph_objects as go
+
+    if not figs:
+        raise ValueError("At least one figure is required.")
+    if cols < 1:
+        raise ValueError(f"cols must be >= 1, got {cols}.")
+
+    for i, fig in enumerate(figs):
+        if fig.frames:
+            raise ValueError(
+                f"Figure at position {i} has animation frames. "
+                "Animated figures are not supported in subplots()."
+            )
+
+    rows = math.ceil(len(figs) / cols)
+    combined = go.Figure()
+
+    # Grid spacing
+    h_gap = 0.05
+    v_gap = 0.08
+    cell_w = (1.0 - h_gap * (cols - 1)) / cols
+    cell_h = (1.0 - v_gap * (rows - 1)) / rows
+
+    next_x_num = 1
+    next_y_num = 1
+
+    for i, fig in enumerate(figs):
+        row = i // cols  # 0-indexed, top to bottom
+        col = i % cols
+
+        # Cell boundaries (clamped to [0, 1])
+        cell_x0 = max(0.0, col * (cell_w + h_gap))
+        cell_x1 = min(1.0, cell_x0 + cell_w)
+        cell_y1 = min(1.0, 1.0 - row * (cell_h + v_gap))  # top-down
+        cell_y0 = max(0.0, cell_y1 - cell_h)
+
+        # Build axis remapping: old axis ref → new axis ref
+        axis_map, next_x_num, next_y_num = _remap_figure_axes(
+            fig, combined, next_x_num, next_y_num, cell_x0, cell_x1, cell_y0, cell_y1
+        )
+
+        # Add traces with remapped axis refs
+        for trace in fig.data:
+            tc = copy.deepcopy(trace)
+            old_x = getattr(tc, "xaxis", None) or "x"
+            old_y = getattr(tc, "yaxis", None) or "y"
+            tc.xaxis = axis_map[old_x]["new_x"]
+            tc.yaxis = axis_map[old_y]["new_y"]
+            combined.add_trace(tc)
+
+        # Add subplot title as annotation
+        title = _get_figure_title(fig)
+        if title:
+            combined.add_annotation(
+                text=f"<b>{title}</b>",
+                x=(cell_x0 + cell_x1) / 2,
+                y=cell_y1,
+                xref="paper",
+                yref="paper",
+                xanchor="center",
+                yanchor="bottom",
+                showarrow=False,
+                font={"size": 14},
+            )
+
+    return combined
+
+
+# Axis properties safe to copy between figures (display-only, not structural).
+_AXIS_PROPS_TO_COPY = (
+    "title",
+    "type",
+    "tickformat",
+    "ticksuffix",
+    "tickprefix",
+    "dtick",
+    "tick0",
+    "nticks",
+    "showgrid",
+    "gridcolor",
+    "gridwidth",
+    "autorange",
+    "range",
+    "zeroline",
+    "zerolinecolor",
+    "zerolinewidth",
+    "showticklabels",
+)
+
+
+def _axis_layout_key(ref: str) -> str:
+    """Convert axis reference to layout property name.
+
+    ``"x"`` → ``"xaxis"``, ``"x2"`` → ``"xaxis2"``,
+    ``"y"`` → ``"yaxis"``, ``"y3"`` → ``"yaxis3"``.
+    """
+    if ref in ("x", "y"):
+        return f"{ref}axis"
+    prefix = ref[0]  # "x" or "y"
+    num = ref[1:]
+    return f"{prefix}axis{num}"
+
+
+def _new_axis_ref(prefix: str, num: int) -> str:
+    """Build an axis reference string. ``_new_axis_ref("x", 1)`` → ``"x"``, ``("x", 3)`` → ``"x3"``."""
+    return prefix if num == 1 else f"{prefix}{num}"
+
+
+def _remap_figure_axes(
+    fig: go.Figure,
+    combined: go.Figure,
+    next_x_num: int,
+    next_y_num: int,
+    cell_x0: float,
+    cell_x1: float,
+    cell_y0: float,
+    cell_y1: float,
+) -> tuple[dict[str, dict[str, str]], int, int]:
+    """Remap a figure's axes into a grid cell, adding axis configs to the combined layout.
+
+    Args:
+        fig: Source figure.
+        combined: Target combined figure (mutated — axis configs added to layout).
+        next_x_num: Next available x-axis number.
+        next_y_num: Next available y-axis number.
+        cell_x0, cell_x1: Horizontal cell bounds in paper coordinates.
+        cell_y0, cell_y1: Vertical cell bounds in paper coordinates.
+
+    Returns:
+        Tuple of (axis_map, next_x_num, next_y_num).
+        axis_map maps old axis refs to ``{"new_x": ...}`` or ``{"new_y": ...}``.
+    """
+    cell_w = cell_x1 - cell_x0
+    cell_h = cell_y1 - cell_y0
+    src_layout = fig.layout.to_plotly_json()
+
+    x_remap: dict[str, str] = {}
+    y_remap: dict[str, str] = {}
+
+    # Get all unique axis refs
+    x_refs: set[str] = set()
+    y_refs: set[str] = set()
+    for trace in fig.data:
+        x_refs.add(getattr(trace, "xaxis", None) or "x")
+        y_refs.add(getattr(trace, "yaxis", None) or "y")
+
+    # Remap x-axes
+    for old_xref in sorted(x_refs, key=lambda r: int(r[1:]) if len(r) > 1 else 1):
+        new_xref = _new_axis_ref("x", next_x_num)
+        x_remap[old_xref] = new_xref
+
+        src_config = src_layout.get(_axis_layout_key(old_xref), {})
+        src_domain = src_config.get("domain", [0.0, 1.0])
+        new_domain = [
+            max(0.0, cell_x0 + src_domain[0] * cell_w),
+            min(1.0, cell_x0 + src_domain[1] * cell_w),
+        ]
+
+        new_config: dict[str, Any] = {"domain": new_domain}
+        for prop in _AXIS_PROPS_TO_COPY:
+            if prop in src_config:
+                new_config[prop] = src_config[prop]
+
+        combined.layout[_axis_layout_key(new_xref)] = new_config
+        next_x_num += 1
+
+    # Remap y-axes
+    for old_yref in sorted(y_refs, key=lambda r: int(r[1:]) if len(r) > 1 else 1):
+        new_yref = _new_axis_ref("y", next_y_num)
+        y_remap[old_yref] = new_yref
+
+        src_config = src_layout.get(_axis_layout_key(old_yref), {})
+        src_domain = src_config.get("domain", [0.0, 1.0])
+        new_domain = [
+            max(0.0, cell_y0 + src_domain[0] * cell_h),
+            min(1.0, cell_y0 + src_domain[1] * cell_h),
+        ]
+
+        new_config = {"domain": new_domain}
+        for prop in _AXIS_PROPS_TO_COPY:
+            if prop in src_config:
+                new_config[prop] = src_config[prop]
+
+        combined.layout[_axis_layout_key(new_yref)] = new_config
+        next_y_num += 1
+
+    # Set anchors between paired axes
+    for trace in fig.data:
+        old_x = getattr(trace, "xaxis", None) or "x"
+        old_y = getattr(trace, "yaxis", None) or "y"
+        combined.layout[_axis_layout_key(x_remap[old_x])]["anchor"] = y_remap[old_y]
+        combined.layout[_axis_layout_key(y_remap[old_y])]["anchor"] = x_remap[old_x]
+
+    # Propagate matches relationships
+    for old_ref, new_ref in x_remap.items():
+        src_config = src_layout.get(_axis_layout_key(old_ref), {})
+        if "matches" in src_config and src_config["matches"] in x_remap:
+            combined.layout[_axis_layout_key(new_ref)]["matches"] = x_remap[src_config["matches"]]
+
+    for old_ref, new_ref in y_remap.items():
+        src_config = src_layout.get(_axis_layout_key(old_ref), {})
+        if "matches" in src_config and src_config["matches"] in y_remap:
+            combined.layout[_axis_layout_key(new_ref)]["matches"] = y_remap[src_config["matches"]]
+
+    # Build combined return mapping
+    result: dict[str, dict[str, str]] = {}
+    for old_x, new_x in x_remap.items():
+        result[old_x] = {"new_x": new_x}
+    for old_y, new_y in y_remap.items():
+        result[old_y] = {"new_y": new_y}
+
+    return result, next_x_num, next_y_num
 
 
 def update_traces(

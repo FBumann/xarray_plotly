@@ -1,4 +1,4 @@
-"""Tests for the figures module (overlay, add_secondary_y)."""
+"""Tests for the figures module (overlay, add_secondary_y, subplots)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import pytest
 import xarray as xr
 
-from xarray_plotly import add_secondary_y, overlay, xpx
+from xarray_plotly import add_secondary_y, overlay, subplots, xpx
 
 
 class TestOverlayBasic:
@@ -616,3 +616,309 @@ class TestAddSecondaryYDeepCopy:
 
         # Secondary traces should still use original yaxis
         assert secondary.data[0].yaxis == original_yaxis
+
+
+class TestLegendVisibility:
+    """Tests that combined figures preserve legend visibility."""
+
+    def test_overlay_single_trace_figures_with_names(self) -> None:
+        """Overlay of named single-trace figures shows legend."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="a")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="b")
+
+        fig1 = xpx(da1).line()
+        fig1.update_traces(name="Series A")
+        fig2 = xpx(da2).line()
+        fig2.update_traces(name="Series B")
+
+        combined = overlay(fig1, fig2)
+
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_unnamed_traces_get_yaxis_title(self) -> None:
+        """Overlay of unnamed traces derives names from y-axis titles."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="Pressure")
+
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+
+        combined = overlay(fig1, fig2)
+
+        # Names derived from y-axis titles (DataArray names)
+        assert combined.data[0].name == "Temperature"
+        assert combined.data[1].name == "Pressure"
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_same_name_disambiguated(self) -> None:
+        """Overlay of figures with same y-axis title gets numeric suffix."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="value")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="value")
+
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+
+        combined = overlay(fig1, fig2)
+
+        assert combined.data[0].name == "value (1)"
+        assert combined.data[1].name == "value (2)"
+
+    def test_overlay_multi_trace_deduplicates_legend(self) -> None:
+        """Overlay of multi-trace figures deduplicates shared legendgroups."""
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["A", "B", "C"]},
+        )
+        fig1 = xpx(da).area()
+        fig2 = xpx(da).line()
+
+        combined = overlay(fig1, fig2)
+
+        # First occurrence of each legendgroup should show, duplicates hidden
+        from collections import defaultdict
+
+        groups: dict[str, list[bool]] = defaultdict(list)
+        for trace in combined.data:
+            lg = trace.legendgroup
+            groups[lg].append(trace.showlegend is True)
+
+        for lg, flags in groups.items():
+            assert flags.count(True) == 1, f"legendgroup {lg!r} has {flags.count(True)} visible"
+
+    def test_add_secondary_y_single_trace_with_names(self) -> None:
+        """add_secondary_y of named single-trace figures shows legend."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="temp")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="precip")
+
+        fig1 = xpx(da1).line()
+        fig1.update_traces(name="Temperature")
+        fig2 = xpx(da2).bar()
+        fig2.update_traces(name="Precipitation")
+
+        combined = add_secondary_y(fig1, fig2)
+
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_faceted_legendgroup_dedup(self) -> None:
+        """Faceted overlay keeps only one showlegend=True per legendgroup."""
+        da = xr.DataArray(
+            np.random.rand(10, 2, 2),
+            dims=["x", "cat", "facet"],
+            coords={"cat": ["A", "B"], "facet": ["left", "right"]},
+        )
+        fig1 = xpx(da).area(facet_col="facet")
+        fig2 = xpx(da).line(facet_col="facet")
+
+        combined = overlay(fig1, fig2)
+
+        # Check each legendgroup has at least one showlegend=True
+        from collections import defaultdict
+
+        groups: dict[str, list[bool]] = defaultdict(list)
+        for trace in combined.data:
+            lg = trace.legendgroup or ""
+            if lg:
+                groups[lg].append(trace.showlegend is True)
+
+        for lg, flags in groups.items():
+            assert any(flags), f"legendgroup {lg!r} has no showlegend=True trace"
+
+    def test_overlay_animation_frames_preserve_style(self) -> None:
+        """Animation frame traces keep legend and color from fig.data."""
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "time"],
+            coords={"time": [0, 1, 2]},
+            name="Population",
+        )
+        da_smooth = da.rolling(x=3, center=True).mean()
+        da_smooth.name = "Smoothed"
+
+        fig1 = xpx(da).bar(animation_frame="time")
+        fig1.update_traces(marker={"color": "steelblue"})
+        fig2 = xpx(da_smooth).line(animation_frame="time")
+        fig2.update_traces(line={"color": "red"})
+
+        combined = overlay(fig1, fig2)
+
+        for frame in combined.frames:
+            for i, ft in enumerate(frame.data):
+                src = combined.data[i]
+                assert ft.name == src.name
+                assert ft.showlegend == src.showlegend
+                assert ft.legendgroup == src.legendgroup
+            # Bar trace should keep steelblue
+            assert frame.data[0].marker.color == "steelblue"
+            # Line trace should keep red
+            assert frame.data[1].line.color == "red"
+
+
+class TestAnimationAxisRanges:
+    """Tests for _fix_animation_axis_ranges."""
+
+    def test_datetime_x_axis_not_corrupted(self) -> None:
+        """datetime64 x-axis should be left on autorange, not cast to float epochs."""
+        dates = np.array(["2020-01-01", "2020-06-01", "2021-01-01"], dtype="datetime64[ns]")
+        da = xr.DataArray(
+            np.random.rand(3, 2),
+            dims=["date", "cat"],
+            coords={"date": dates, "cat": ["A", "B"]},
+            name="value",
+        )
+        fig1 = xpx(da).line(animation_frame="cat")
+        fig2 = xpx(da).scatter(animation_frame="cat")
+        combined = overlay(fig1, fig2)
+
+        # x-axis range should NOT be set (dates left to autorange)
+        assert combined.layout.xaxis.range is None
+
+    def test_bar_zero_baseline(self) -> None:
+        """Bar chart y-axis range should include zero."""
+        da = xr.DataArray(
+            np.array([[100, 200], [150, 250]]),
+            dims=["x", "frame"],
+            name="val",
+        )
+        fig = xpx(da).bar(animation_frame="frame")
+        # After overlay (which triggers _fix_animation_axis_ranges)
+        combined = overlay(fig, xpx(da).line(animation_frame="frame"))
+
+        lo, _hi = combined.layout.yaxis.range
+        assert lo <= 0, f"Bar y-axis range should include 0, got lo={lo}"
+
+
+class TestSubplotsBasic:
+    """Basic tests for subplots function."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+        self.da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        self.da2 = xr.DataArray([10, 20, 30], dims=["x"], name="Rainfall")
+        self.da3 = xr.DataArray([100, 200, 300], dims=["x"], name="Wind")
+
+    def test_single_figure(self) -> None:
+        fig = xpx(self.da1).line()
+        grid = subplots(fig)
+        assert len(grid.data) == 1
+
+    def test_two_figures_one_column(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        grid = subplots(fig1, fig2, cols=1)
+        assert len(grid.data) == 2
+        # Should be on different y-axes (different rows)
+        assert grid.data[0].yaxis != grid.data[1].yaxis
+
+    def test_two_figures_two_columns(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == 2
+        assert grid.data[0].xaxis != grid.data[1].xaxis
+
+    def test_three_figures_two_columns(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = xpx(self.da2).bar()
+        fig3 = xpx(self.da3).scatter()
+        grid = subplots(fig1, fig2, fig3, cols=2)
+        assert len(grid.data) == 3
+
+    def test_trace_count_preserved(self) -> None:
+        da_multi = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["A", "B", "C"]},
+        )
+        fig1 = xpx(da_multi).line()  # 3 traces
+        fig2 = xpx(self.da1).bar()  # 1 trace
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == len(fig1.data) + len(fig2.data)
+
+    def test_with_empty_figure(self) -> None:
+        fig1 = xpx(self.da1).line()
+        fig2 = go.Figure()
+        grid = subplots(fig1, fig2, cols=2)
+        assert len(grid.data) == 1
+
+
+class TestSubplotsTitles:
+    """Tests for subplot title derivation."""
+
+    def test_titles_from_figure_title(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["x"], name="val")
+        fig1 = xpx(da).line(title="My Title")
+        fig2 = xpx(da).bar(title="Other Title")
+        grid = subplots(fig1, fig2, cols=2)
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == ["<b>My Title</b>", "<b>Other Title</b>"]
+
+    def test_titles_from_yaxis_label(self) -> None:
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="Pressure")
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+        grid = subplots(fig1, fig2, cols=2)
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == ["<b>Temperature</b>", "<b>Pressure</b>"]
+
+    def test_titles_fallback_empty(self) -> None:
+        grid = subplots(go.Figure(), go.Figure(), cols=2)
+        # No annotations are created for empty titles
+        titles = [ann.text for ann in grid.layout.annotations]
+        assert titles == []
+
+
+class TestSubplotsAxisConfig:
+    """Tests for axis configuration copying."""
+
+    def test_axis_titles_copied(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["time"], name="Temperature")
+        fig = xpx(da).line()
+        grid = subplots(fig)
+        assert grid.layout.yaxis.title.text == "Temperature"
+        assert grid.layout.xaxis.title.text == "time"
+
+
+class TestSubplotsValidation:
+    """Tests for subplots input validation."""
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(ValueError, match="At least one figure"):
+            subplots()
+
+    def test_invalid_cols_raises(self) -> None:
+        with pytest.raises(ValueError, match="cols must be >= 1"):
+            subplots(go.Figure(), cols=0)
+
+    def test_faceted_figures_stacked(self) -> None:
+        """Faceted figures can be stacked in a subplot grid."""
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "facet"],
+            coords={"facet": ["A", "B", "C"]},
+        )
+        fig1 = xpx(da).bar(facet_col="facet")
+        fig2 = xpx(da).line(facet_col="facet")
+        grid = subplots(fig1, fig2, cols=1)
+        # 3 bar traces + 3 line traces
+        assert len(grid.data) == 6
+        # All traces should have unique axis assignments
+        axes = {(t.xaxis, t.yaxis) for t in grid.data}
+        assert len(axes) == 6
+
+    def test_animated_figure_raises(self) -> None:
+        da = xr.DataArray(np.random.rand(10, 3), dims=["x", "time"])
+        fig = xpx(da).line(animation_frame="time")
+        with pytest.raises(ValueError, match="animation frames"):
+            subplots(fig)
+
+    def test_source_not_modified(self) -> None:
+        da = xr.DataArray([1, 2, 3], dims=["x"], name="val")
+        fig = xpx(da).line()
+        original_count = len(fig.data)
+        _ = subplots(fig, fig, cols=2)
+        assert len(fig.data) == original_count
