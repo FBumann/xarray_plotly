@@ -56,9 +56,9 @@ def _ensure_legend_visibility(
     # --- Step 1: label unnamed traces from source y-axis titles -----------
     labels = [_get_yaxis_title(f) for f in source_figs]
 
-    # If all labels are the same, disambiguate
+    # If all labels are non-empty and identical, disambiguate
     unique_labels = {lb for lb in labels if lb}
-    if len(unique_labels) == 1:
+    if len(unique_labels) == 1 and all(lb for lb in labels):
         labels = [f"{labels[0]} ({i + 1})" for i in range(len(labels))]
 
     for label, sl in zip(labels, trace_slices, strict=False):

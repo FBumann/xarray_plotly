@@ -867,7 +867,7 @@ class TestSubplotsTitles:
 
     def test_titles_fallback_empty(self) -> None:
         grid = subplots(go.Figure(), go.Figure(), cols=2)
-        # make_subplots omits annotations for empty titles
+        # No annotations are created for empty titles
         titles = [ann.text for ann in grid.layout.annotations]
         assert titles == []
 
