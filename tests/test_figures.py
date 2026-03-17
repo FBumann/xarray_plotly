@@ -616,3 +616,142 @@ class TestAddSecondaryYDeepCopy:
 
         # Secondary traces should still use original yaxis
         assert secondary.data[0].yaxis == original_yaxis
+
+
+class TestLegendVisibility:
+    """Tests that combined figures preserve legend visibility."""
+
+    def test_overlay_single_trace_figures_with_names(self) -> None:
+        """Overlay of named single-trace figures shows legend."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="a")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="b")
+
+        fig1 = xpx(da1).line()
+        fig1.update_traces(name="Series A")
+        fig2 = xpx(da2).line()
+        fig2.update_traces(name="Series B")
+
+        combined = overlay(fig1, fig2)
+
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_unnamed_traces_get_yaxis_title(self) -> None:
+        """Overlay of unnamed traces derives names from y-axis titles."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="Pressure")
+
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+
+        combined = overlay(fig1, fig2)
+
+        # Names derived from y-axis titles (DataArray names)
+        assert combined.data[0].name == "Temperature"
+        assert combined.data[1].name == "Pressure"
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_same_name_disambiguated(self) -> None:
+        """Overlay of figures with same y-axis title gets numeric suffix."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="value")
+        da2 = xr.DataArray([4, 5, 6], dims=["x"], name="value")
+
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+
+        combined = overlay(fig1, fig2)
+
+        assert combined.data[0].name == "value (1)"
+        assert combined.data[1].name == "value (2)"
+
+    def test_overlay_multi_trace_deduplicates_legend(self) -> None:
+        """Overlay of multi-trace figures deduplicates shared legendgroups."""
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["A", "B", "C"]},
+        )
+        fig1 = xpx(da).area()
+        fig2 = xpx(da).line()
+
+        combined = overlay(fig1, fig2)
+
+        # First occurrence of each legendgroup should show, duplicates hidden
+        from collections import defaultdict
+
+        groups: dict[str, list[bool]] = defaultdict(list)
+        for trace in combined.data:
+            lg = trace.legendgroup
+            groups[lg].append(trace.showlegend is True)
+
+        for lg, flags in groups.items():
+            assert flags.count(True) == 1, f"legendgroup {lg!r} has {flags.count(True)} visible"
+
+    def test_add_secondary_y_single_trace_with_names(self) -> None:
+        """add_secondary_y of named single-trace figures shows legend."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="temp")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="precip")
+
+        fig1 = xpx(da1).line()
+        fig1.update_traces(name="Temperature")
+        fig2 = xpx(da2).bar()
+        fig2.update_traces(name="Precipitation")
+
+        combined = add_secondary_y(fig1, fig2)
+
+        assert combined.data[0].showlegend is True
+        assert combined.data[1].showlegend is True
+
+    def test_overlay_faceted_legendgroup_dedup(self) -> None:
+        """Faceted overlay keeps only one showlegend=True per legendgroup."""
+        da = xr.DataArray(
+            np.random.rand(10, 2, 2),
+            dims=["x", "cat", "facet"],
+            coords={"cat": ["A", "B"], "facet": ["left", "right"]},
+        )
+        fig1 = xpx(da).area(facet_col="facet")
+        fig2 = xpx(da).line(facet_col="facet")
+
+        combined = overlay(fig1, fig2)
+
+        # Check each legendgroup has at least one showlegend=True
+        from collections import defaultdict
+
+        groups: dict[str, list[bool]] = defaultdict(list)
+        for trace in combined.data:
+            lg = trace.legendgroup or ""
+            if lg:
+                groups[lg].append(trace.showlegend is True)
+
+        for lg, flags in groups.items():
+            assert any(flags), f"legendgroup {lg!r} has no showlegend=True trace"
+
+    def test_overlay_animation_frames_preserve_style(self) -> None:
+        """Animation frame traces keep legend and color from fig.data."""
+        da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "time"],
+            coords={"time": [0, 1, 2]},
+            name="Population",
+        )
+        da_smooth = da.rolling(x=3, center=True).mean()
+        da_smooth.name = "Smoothed"
+
+        fig1 = xpx(da).bar(animation_frame="time")
+        fig1.update_traces(marker={"color": "steelblue"})
+        fig2 = xpx(da_smooth).line(animation_frame="time")
+        fig2.update_traces(line={"color": "red"})
+
+        combined = overlay(fig1, fig2)
+
+        for frame in combined.frames:
+            for i, ft in enumerate(frame.data):
+                src = combined.data[i]
+                assert ft.name == src.name
+                assert ft.showlegend == src.showlegend
+                assert ft.legendgroup == src.legendgroup
+            # Bar trace should keep steelblue
+            assert frame.data[0].marker.color == "steelblue"
+            # Line trace should keep red
+            assert frame.data[1].line.color == "red"
