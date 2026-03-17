@@ -787,7 +787,7 @@ class TestAnimationAxisRanges:
         # After overlay (which triggers _fix_animation_axis_ranges)
         combined = overlay(fig, xpx(da).line(animation_frame="frame"))
 
-        lo, hi = combined.layout.yaxis.range
+        lo, _hi = combined.layout.yaxis.range
         assert lo <= 0, f"Bar y-axis range should include 0, got lo={lo}"
 
 
