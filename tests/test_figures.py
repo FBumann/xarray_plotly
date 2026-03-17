@@ -757,6 +757,40 @@ class TestLegendVisibility:
             assert frame.data[1].line.color == "red"
 
 
+class TestAnimationAxisRanges:
+    """Tests for _fix_animation_axis_ranges."""
+
+    def test_datetime_x_axis_not_corrupted(self) -> None:
+        """datetime64 x-axis should be left on autorange, not cast to float epochs."""
+        dates = np.array(["2020-01-01", "2020-06-01", "2021-01-01"], dtype="datetime64[ns]")
+        da = xr.DataArray(
+            np.random.rand(3, 2),
+            dims=["date", "cat"],
+            coords={"date": dates, "cat": ["A", "B"]},
+            name="value",
+        )
+        fig1 = xpx(da).line(animation_frame="cat")
+        fig2 = xpx(da).scatter(animation_frame="cat")
+        combined = overlay(fig1, fig2)
+
+        # x-axis range should NOT be set (dates left to autorange)
+        assert combined.layout.xaxis.range is None
+
+    def test_bar_zero_baseline(self) -> None:
+        """Bar chart y-axis range should include zero."""
+        da = xr.DataArray(
+            np.array([[100, 200], [150, 250]]),
+            dims=["x", "frame"],
+            name="val",
+        )
+        fig = xpx(da).bar(animation_frame="frame")
+        # After overlay (which triggers _fix_animation_axis_ranges)
+        combined = overlay(fig, xpx(da).line(animation_frame="frame"))
+
+        lo, hi = combined.layout.yaxis.range
+        assert lo <= 0, f"Bar y-axis range should include 0, got lo={lo}"
+
+
 class TestSubplotsBasic:
     """Basic tests for subplots function."""
 

@@ -136,35 +136,49 @@ def _fix_animation_axis_ranges(fig: go.Figure) -> None:
     y_by_axis: dict[str, list[float]] = defaultdict(list)
     x_by_axis: dict[str, list[float]] = defaultdict(list)
 
+    # Track which axes have bar traces (for zero-baseline clamping)
+    y_has_vbar: set[str] = set()  # vertical bars → y-axis includes 0
+    x_has_hbar: set[str] = set()  # horizontal bars → x-axis includes 0
+
     for trace in _iter_all_traces(fig):
         yaxis = getattr(trace, "yaxis", None) or "y"
         xaxis = getattr(trace, "xaxis", None) or "x"
 
-        y = getattr(trace, "y", None)
-        if y is not None:
+        # Track bar orientations
+        if getattr(trace, "type", None) == "bar":
+            orientation = getattr(trace, "orientation", None) or "v"
+            if orientation == "h":
+                x_has_hbar.add(xaxis)
+            else:
+                y_has_vbar.add(yaxis)
+
+        for data_attr, axis_ref, by_axis in [
+            ("y", yaxis, y_by_axis),
+            ("x", xaxis, x_by_axis),
+        ]:
+            vals = getattr(trace, data_attr, None)
+            if vals is None:
+                continue
+            arr = np.asarray(vals)
+            # Skip datetime/timedelta — leave those axes on autorange
+            if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
+                continue
             try:
-                arr = np.asarray(y, dtype=float)
+                arr = arr.astype(float)
                 finite = arr[np.isfinite(arr)]
                 if len(finite):
-                    y_by_axis[yaxis].extend(finite.tolist())
+                    by_axis[axis_ref].extend(finite.tolist())
             except (ValueError, TypeError):
                 pass  # Non-numeric (categorical) — skip
-
-        x = getattr(trace, "x", None)
-        if x is not None:
-            try:
-                arr = np.asarray(x, dtype=float)
-                finite = arr[np.isfinite(arr)]
-                if len(finite):
-                    x_by_axis[xaxis].extend(finite.tolist())
-            except (ValueError, TypeError):
-                pass
 
     # Apply ranges to layout
     for axis_ref, values in y_by_axis.items():
         if not values:
             continue
         lo, hi = min(values), max(values)
+        if axis_ref in y_has_vbar:
+            lo = min(lo, 0.0)
+            hi = max(hi, 0.0)
         pad = (hi - lo) * 0.05 or 1  # 5% padding
         layout_prop = "yaxis" if axis_ref == "y" else f"yaxis{axis_ref[1:]}"
         fig.layout[layout_prop].range = [lo - pad, hi + pad]
@@ -173,6 +187,9 @@ def _fix_animation_axis_ranges(fig: go.Figure) -> None:
         if not values:
             continue
         lo, hi = min(values), max(values)
+        if axis_ref in x_has_hbar:
+            lo = min(lo, 0.0)
+            hi = max(hi, 0.0)
         pad = (hi - lo) * 0.05 or 1
         layout_prop = "xaxis" if axis_ref == "x" else f"xaxis{axis_ref[1:]}"
         fig.layout[layout_prop].range = [lo - pad, hi + pad]
@@ -613,7 +630,7 @@ def _get_figure_title(fig: go.Figure) -> str:
     """
     try:
         title = fig.layout.title.text
-        if title:
+        if isinstance(title, str) and title:
             return title
     except AttributeError:
         pass
