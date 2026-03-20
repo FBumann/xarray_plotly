@@ -1,0 +1,35 @@
+name: Test Latest Dependencies
+
+on:
+  schedule:
+    # Every Monday at 07:00 UTC
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  test-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install with latest dependencies
+        run: uv sync --extra dev --upgrade
+
+      - name: Test
+        run: uv run pytest --cov=xarray_plotly
+
+      - name: Print dependency versions
+        if: always()
+        run: uv pip list | grep -iE "xarray|plotly|pandas" || true
