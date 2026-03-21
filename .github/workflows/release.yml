@@ -1,28 +1,72 @@
-name: Release (Manual)
+name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release (e.g., v0.0.13)'
+      branch:
+        description: Branch to create the release from
         required: true
+        default: main
+      prerelease:
+        description: Create a pre-release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # for trusted publishing
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-24.04
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ steps.app-token.outputs.token }}
+          target-branch: ${{ inputs.branch || github.ref_name }}
+          prerelease: ${{ inputs.prerelease }}
+
+  publish:
+    name: Build & publish to PyPI
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/xarray_plotly
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
-      - name: Build package
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build
         run: uv build
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
