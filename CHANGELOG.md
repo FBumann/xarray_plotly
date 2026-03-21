@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.15](https://github.com/FBumann/xarray_plotly/compare/v0.0.14...v0.0.15) (2026-03-21)
+
+
+### Bug Fixes
+
+* legend, style persistence, and axis ranges in combined figures ([#53](https://github.com/FBumann/xarray_plotly/issues/53)) ([28fccc3](https://github.com/FBumann/xarray_plotly/commit/28fccc3d32da334625e626096bfcbf78e3c65de6))
+
 ## [0.0.14](https://github.com/FBumann/xarray_plotly/compare/v0.0.13...v0.0.14) (2026-03-09)
 
 
