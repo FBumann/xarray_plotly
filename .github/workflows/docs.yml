@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:  # Manual trigger
   workflow_run:
-    workflows: ["Release (Manual)", "Release Please"]
+    workflows: ["Publish"]
     types: [completed]
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   docs:
     runs-on: ubuntu-latest
-    # Run on PR, manual trigger, or successful Release
+    # Run on PR, manual trigger, or successful Publish
     if: |
       github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # For workflow_run, checkout the commit that triggered Release
+          # For workflow_run, checkout the commit that triggered Publish
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Install uv
@@ -38,7 +38,7 @@ jobs:
         run: uv run mkdocs build
 
       - name: Deploy to GitHub Pages
-        # Deploy on manual trigger or after successful Release
+        # Deploy on manual trigger or after successful Publish
         if: github.event_name != 'pull_request'
         uses: peaceiris/actions-gh-pages@v4
         with:

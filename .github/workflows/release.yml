@@ -22,9 +22,6 @@ jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-24.04
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: actions/create-github-app-token@v2
         id: app-token
@@ -40,12 +37,3 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           target-branch: ${{ inputs.branch || github.ref_name }}
           prerelease: ${{ inputs.prerelease }}
-
-  publish:
-    needs: [release-please]
-    if: needs.release-please.outputs.release_created
-    permissions:
-      id-token: write
-    uses: ./.github/workflows/publish.yml
-    with:
-      tag: ${{ needs.release-please.outputs.tag_name }}
