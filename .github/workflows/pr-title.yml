@@ -3,6 +3,8 @@ name: PR Title Check
 on:
   pull_request:
     types: [opened, edited, reopened]
+  push:
+    branches: ['release-please--**']
 
 jobs:
   validate:
@@ -17,15 +19,12 @@ jobs:
           types: |
             feat
             fix
-            docs
-            style
-            refactor
-            perf
+            refac
             test
-            build
-            ci
+            docs
             chore
-            revert
+            ci
+            perf
           # Scope is optional
           requireScope: false
           # Subject (description) requirements
