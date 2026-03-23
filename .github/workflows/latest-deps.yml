@@ -25,7 +25,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install with latest dependencies
-        run: uv sync --extra dev --upgrade
+        run: uv sync --group dev --upgrade
 
       - name: Test
         run: uv run pytest --cov=xarray_plotly

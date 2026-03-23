@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:  # Manual trigger
   workflow_run:
-    workflows: ["Release (Manual)", "Release Please"]
+    workflows: ["Publish"]
     types: [completed]
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
-        run: uv sync --extra docs
+        run: uv sync --group docs
 
       - name: Build docs
         run: uv run mkdocs build
