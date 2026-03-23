@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:  # Manual trigger
   workflow_run:
-    workflows: ["Release (Manual)", "Release Please"]
+    workflows: ["Publish"]
     types: [completed]
 
 permissions:
