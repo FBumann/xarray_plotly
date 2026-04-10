@@ -41,10 +41,10 @@ docs = [
 ]
 dev = [
     {include-group = "docs"},
-    "pytest==9.0.2",
-    "pytest-cov==7.0.0",
-    "mypy==1.19.1",
-    "ruff==0.15.7",
+    "pytest==9.0.3",
+    "pytest-cov==7.1.0",
+    "mypy==1.20.0",
+    "ruff==0.15.10",
     "pre-commit==4.5.1",
     "nbstripout==0.9.1",
 ]
