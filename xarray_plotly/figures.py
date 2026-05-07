@@ -28,10 +28,40 @@ def _get_yaxis_title(fig: go.Figure) -> str:
         return ""
 
 
+def _dedup_legend_within_traces(traces: list[Any]) -> None:
+    """Ensure one ``showlegend=True`` per ``legendgroup`` among the given traces."""
+    from collections import defaultdict
+
+    grouped: dict[str, list[Any]] = defaultdict(list)
+    ungrouped: list[Any] = []
+
+    for trace in traces:
+        lg = getattr(trace, "legendgroup", None) or ""
+        if lg:
+            grouped[lg].append(trace)
+        else:
+            ungrouped.append(trace)
+
+    for group_traces in grouped.values():
+        has_visible = False
+        for t in group_traces:
+            if has_visible:
+                t.showlegend = False
+            elif getattr(t, "name", None):
+                t.showlegend = True
+                has_visible = True
+
+    for trace in ungrouped:
+        if getattr(trace, "name", None):
+            trace.showlegend = True
+
+
 def _ensure_legend_visibility(
     combined: go.Figure,
     source_figs: list[go.Figure],
     trace_slices: list[slice],
+    *,
+    cross_source_dedup: bool = True,
 ) -> None:
     """Fix legend visibility on a combined figure.
 
@@ -43,13 +73,19 @@ def _ensure_legend_visibility(
        figures.  We ensure at least one trace per ``legendgroup`` (or each
        ungrouped named trace) has ``showlegend=True``.
     3. **Duplicate legend entries** — when two source figures share the same
-       ``legendgroup`` names, we deduplicate so only the first trace per
-       group shows in the legend.
+       ``legendgroup`` names and ``cross_source_dedup=True`` (the default),
+       we deduplicate so only the first trace per group shows in the legend.
+       When ``cross_source_dedup=False``, traces from different sources are
+       kept independent: colliding ``legendgroup`` names are namespaced with
+       the source label so each source's traces get their own legend entries.
 
     Args:
         combined: The combined Plotly figure (mutated in place).
         source_figs: The original source figures, in trace order.
         trace_slices: Slices into ``combined.data`` for each source figure.
+        cross_source_dedup: If True (overlay default), dedup legend entries
+            across all sources. If False (add_secondary_y), preserve each
+            source's legend entries independently.
     """
     from collections import defaultdict
 
@@ -70,30 +106,39 @@ def _ensure_legend_visibility(
                 trace.legendgroup = label
 
     # --- Step 2 & 3: fix showlegend per legendgroup -----------------------
-    grouped: dict[str, list[Any]] = defaultdict(list)
-    ungrouped: list[Any] = []
+    if cross_source_dedup:
+        _dedup_legend_within_traces(list(combined.data))
+    else:
+        # Namespace legendgroups that collide across slices, so each source
+        # keeps its own legend entries instead of being deduped away.
+        slice_groups: list[set[str]] = []
+        for sl in trace_slices:
+            slice_groups.append(
+                {
+                    getattr(t, "legendgroup", None)
+                    for t in combined.data[sl]
+                    if getattr(t, "legendgroup", None)
+                }  # type: ignore[misc]
+            )
+        group_counts: dict[str, int] = defaultdict(int)
+        for sg in slice_groups:
+            for g in sg:
+                group_counts[g] += 1
+        colliding = {g for g, cnt in group_counts.items() if cnt > 1}
 
-    for trace in combined.data:
-        lg = getattr(trace, "legendgroup", None) or ""
-        if lg:
-            grouped[lg].append(trace)
-        else:
-            ungrouped.append(trace)
+        for label, sl in zip(labels, trace_slices, strict=False):
+            if not label:
+                continue
+            for trace in combined.data[sl]:
+                lg = getattr(trace, "legendgroup", None)
+                if lg and lg in colliding:
+                    new_lg = f"{lg} ({label})"
+                    trace.legendgroup = new_lg
+                    if getattr(trace, "name", None) == lg:
+                        trace.name = new_lg
 
-    for traces in grouped.values():
-        has_visible = False
-        for t in traces:
-            if has_visible:
-                # Deduplicate: only first keeps showlegend
-                t.showlegend = False
-            elif getattr(t, "name", None):
-                t.showlegend = True
-                has_visible = True
-
-    # Ungrouped traces with a name should show in the legend
-    for trace in ungrouped:
-        if getattr(trace, "name", None):
-            trace.showlegend = True
+        for sl in trace_slices:
+            _dedup_legend_within_traces(list(combined.data[sl]))
 
     # --- Step 4: propagate style properties to animation frame traces ------
     # When Plotly animates, frame trace data overwrites fig.data properties.
@@ -557,6 +602,7 @@ def add_secondary_y(
         combined,
         [base, secondary],
         [slice(0, base_n), slice(base_n, base_n + sec_n)],
+        cross_source_dedup=False,
     )
     _fix_animation_axis_ranges(combined)
     return combined

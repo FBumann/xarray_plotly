@@ -703,6 +703,60 @@ class TestLegendVisibility:
         assert combined.data[0].showlegend is True
         assert combined.data[1].showlegend is True
 
+    def test_add_secondary_y_multi_trace_shared_legendgroups(self) -> None:
+        """add_secondary_y must keep the secondary's traces visible in the legend
+        even when both figures share legendgroup names (e.g. PX color=...)."""
+        da1 = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var1",
+        )
+        da2 = xr.DataArray(
+            np.random.rand(10, 3) * 100,
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var2",
+        )
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da2).line()
+
+        combined = add_secondary_y(fig1, fig2)
+
+        # All 6 traces must end up visible in the legend with distinct legendgroups.
+        assert all(t.showlegend is True for t in combined.data)
+        legendgroups = [t.legendgroup for t in combined.data]
+        assert len(set(legendgroups)) == len(legendgroups)
+        # Secondary traces remain on y2.
+        assert all(t.yaxis == "y" for t in combined.data[:3])
+        assert all(t.yaxis == "y2" for t in combined.data[3:])
+
+    def test_add_secondary_y_after_overlay_keeps_secondary_visible(self) -> None:
+        """overlay → add_secondary_y must not hide the secondary's traces."""
+        da1 = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var1",
+        )
+        da2 = xr.DataArray(
+            np.random.rand(10, 3) * 100,
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var2",
+        )
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da1).area()
+        overlaid = overlay(fig1, fig2)
+        fig3 = xpx(da2).line()
+
+        combined = add_secondary_y(overlaid, fig3)
+
+        # Secondary traces (last 3) must all be visible in the legend.
+        for t in combined.data[-3:]:
+            assert t.showlegend is True
+            assert t.yaxis == "y2"
+
     def test_overlay_faceted_legendgroup_dedup(self) -> None:
         """Faceted overlay keeps only one showlegend=True per legendgroup."""
         da = xr.DataArray(
