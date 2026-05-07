@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from xarray import DataArray, Dataset
 
 from xarray_plotly import plotting
-from xarray_plotly.common import Colors, SlotValue, auto
+from xarray_plotly.common import Colors, FacetTitlesMode, SlotValue, auto
 from xarray_plotly.config import _options
 
 
@@ -54,6 +54,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive line plot.
@@ -84,6 +85,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -97,6 +99,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive bar chart.
@@ -125,6 +128,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -138,6 +142,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive stacked area chart.
@@ -166,6 +171,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -178,6 +184,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create a bar-like chart using stacked areas for better performance.
@@ -204,6 +211,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -218,6 +226,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive scatter plot.
@@ -252,6 +261,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -264,6 +274,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = None,
         animation_frame: SlotValue = None,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive box plot.
@@ -293,6 +304,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -305,6 +317,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         robust: bool = False,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive heatmap image.
@@ -337,6 +350,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             robust=robust,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -348,6 +362,7 @@ class DataArrayPlotlyAccessor:
         facet_col: SlotValue = auto,
         facet_row: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive pie chart.
@@ -372,6 +387,7 @@ class DataArrayPlotlyAccessor:
             facet_col=facet_col,
             facet_row=facet_row,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -452,6 +468,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive line plot.
@@ -482,6 +499,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -496,6 +514,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive bar chart.
@@ -524,6 +543,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -538,6 +558,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive stacked area chart.
@@ -566,6 +587,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -579,6 +601,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create a bar-like chart using stacked areas for better performance.
@@ -605,6 +628,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -620,6 +644,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive scatter plot.
@@ -650,6 +675,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -663,6 +689,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = None,
         animation_frame: SlotValue = None,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive box plot.
@@ -689,6 +716,7 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             animation_frame=animation_frame,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )
 
@@ -701,6 +729,7 @@ class DatasetPlotlyAccessor:
         facet_col: SlotValue = auto,
         facet_row: SlotValue = auto,
         colors: Colors = None,
+        facet_titles: FacetTitlesMode = "default",
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive pie chart.
@@ -725,5 +754,6 @@ class DatasetPlotlyAccessor:
             facet_col=facet_col,
             facet_row=facet_row,
             colors=colors,
+            facet_titles=facet_titles,
             **px_kwargs,
         )

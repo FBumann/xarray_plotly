@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import warnings
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import plotly.express as px
 
@@ -37,6 +37,13 @@ Colors = str | Sequence[str] | Mapping[str, str] | None
 - Sequence[str]: List of colors for discrete sequence (e.g., ["red", "blue"])
 - Mapping[str, str]: Explicit mapping of values to colors (e.g., {"A": "red"})
 - None: Use Plotly defaults
+"""
+
+FacetTitlesMode = Literal["value", "default"]
+"""Type alias for facet_titles parameter.
+
+- "default" (default): keep PX's ``"<dim>=<value>"`` subplot titles.
+- "value": strip the ``<dim>=`` prefix, leaving just the value.
 """
 
 # Re-export for backward compatibility
