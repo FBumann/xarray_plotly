@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
     import plotly.graph_objects as go
 
+    from xarray_plotly.common import LegendMode
+
 
 def _get_yaxis_title(fig: go.Figure) -> str:
     """Extract the primary y-axis title text from a figure.
@@ -61,31 +63,33 @@ def _ensure_legend_visibility(
     source_figs: list[go.Figure],
     trace_slices: list[slice],
     *,
-    cross_source_dedup: bool = True,
+    mode: LegendMode = "merge",
 ) -> None:
     """Fix legend visibility on a combined figure.
 
-    Handles three problems that arise when combining Plotly Express figures:
+    Three modes control how same-named traces from different source figures
+    are presented in the legend:
 
-    1. **Unnamed traces** — PX sets ``name=""`` on single-trace (no color)
-       figures.  We derive a name from each source figure's y-axis title.
-    2. **Hidden named traces** — PX sets ``showlegend=False`` on single-trace
-       figures.  We ensure at least one trace per ``legendgroup`` (or each
-       ungrouped named trace) has ``showlegend=True``.
-    3. **Duplicate legend entries** — when two source figures share the same
-       ``legendgroup`` names and ``cross_source_dedup=True`` (the default),
-       we deduplicate so only the first trace per group shows in the legend.
-       When ``cross_source_dedup=False``, traces from different sources are
-       kept independent: colliding ``legendgroup`` names are namespaced with
-       the source label so each source's traces get their own legend entries.
+    - ``"merge"``: traces sharing a ``legendgroup`` collapse to a single
+       legend entry (with one ``showlegend=True``).  The default for
+       ``overlay`` and for ``add_secondary_y(legend="merge")``.
+    - ``"suffix"``: colliding ``legendgroup`` names across slices are
+       namespaced with the source figure's y-axis title, so each trace
+       becomes its own legend entry (e.g. ``"Brazil (Population)"`` and
+       ``"Brazil (GDP per Capita)"``).
+    - ``"separate"``: each source figure's traces are deduped only within
+       that source.  Across sources, duplicate names are accepted as-is.
+
+    All three modes also:
+      * Label unnamed traces using each source figure's y-axis title.
+      * Propagate name/legendgroup/style to animation frame traces, since
+        Plotly overwrites these on each frame.
 
     Args:
         combined: The combined Plotly figure (mutated in place).
         source_figs: The original source figures, in trace order.
         trace_slices: Slices into ``combined.data`` for each source figure.
-        cross_source_dedup: If True (overlay default), dedup legend entries
-            across all sources. If False (add_secondary_y), preserve each
-            source's legend entries independently.
+        mode: How to handle cross-source legend entries.
     """
     from collections import defaultdict
 
@@ -106,9 +110,9 @@ def _ensure_legend_visibility(
                 trace.legendgroup = label
 
     # --- Step 2 & 3: fix showlegend per legendgroup -----------------------
-    if cross_source_dedup:
+    if mode == "merge":
         _dedup_legend_within_traces(list(combined.data))
-    else:
+    elif mode == "suffix":
         # Namespace legendgroups that collide across slices, so each source
         # keeps its own legend entries instead of being deduped away.
         slice_groups: list[set[str]] = []
@@ -138,6 +142,14 @@ def _ensure_legend_visibility(
 
         for sl in trace_slices:
             _dedup_legend_within_traces(list(combined.data[sl]))
+    elif mode == "separate":
+        # Dedup only within each source slice.  Cross-source duplicates are
+        # left visible — same-named traces from different figures appear as
+        # distinct legend entries (with possibly identical names).
+        for sl in trace_slices:
+            _dedup_legend_within_traces(list(combined.data[sl]))
+    else:
+        raise ValueError(f"legend mode must be 'suffix', 'merge', or 'separate', got {mode!r}")
 
     # --- Step 4: propagate style properties to animation frame traces ------
     # When Plotly animates, frame trace data overwrites fig.data properties.
@@ -480,6 +492,7 @@ def add_secondary_y(
     secondary: go.Figure,
     *,
     secondary_y_title: str | None = None,
+    legend: LegendMode = "suffix",
 ) -> go.Figure:
     """Add a secondary y-axis with traces from another figure.
 
@@ -493,6 +506,13 @@ def add_secondary_y(
         secondary: The figure whose traces use the secondary y-axis (right).
         secondary_y_title: Optional title for the secondary y-axis.
             If not provided, uses the secondary figure's y-axis title.
+        legend: How to handle same-named traces across the two figures.
+            ``"suffix"`` (default) gives each trace its own legend entry
+            with the source figure's y-axis title appended.  ``"merge"``
+            collapses same-named traces into a single legend entry that
+            toggles both axes together.  ``"separate"`` leaves PX legend
+            output untouched, accepting duplicate names across the two
+            figures.
 
     Returns:
         A new figure with both primary and secondary y-axes.
@@ -519,6 +539,9 @@ def add_secondary_y(
         >>> fig1 = xpx(data).line(facet_col="facet")
         >>> fig2 = xpx(data * 100).bar(facet_col="facet")  # Different scale
         >>> combined = add_secondary_y(fig1, fig2)
+        >>>
+        >>> # Click "Brazil" in the legend toggles both Population and GDP traces
+        >>> combined = add_secondary_y(fig1, fig2, legend="merge")
     """
     import plotly.graph_objects as go
 
@@ -604,7 +627,7 @@ def add_secondary_y(
         combined,
         [base, secondary],
         [slice(0, base_n), slice(base_n, base_n + sec_n)],
-        cross_source_dedup=False,
+        mode=legend,
     )
     _fix_animation_axis_ranges(combined)
     _set_default_secondary_y_layout(combined)
