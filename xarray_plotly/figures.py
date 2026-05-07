@@ -113,13 +113,12 @@ def _ensure_legend_visibility(
         # keeps its own legend entries instead of being deduped away.
         slice_groups: list[set[str]] = []
         for sl in trace_slices:
-            slice_groups.append(
-                {
-                    getattr(t, "legendgroup", None)
-                    for t in combined.data[sl]
-                    if getattr(t, "legendgroup", None)
-                }  # type: ignore[misc]
-            )
+            groups: set[str] = set()
+            for t in combined.data[sl]:
+                lg = getattr(t, "legendgroup", None)
+                if lg:
+                    groups.add(lg)
+            slice_groups.append(groups)
         group_counts: dict[str, int] = defaultdict(int)
         for sg in slice_groups:
             for g in sg:
