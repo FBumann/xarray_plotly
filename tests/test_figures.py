@@ -731,6 +731,38 @@ class TestLegendVisibility:
         assert all(t.yaxis == "y" for t in combined.data[:3])
         assert all(t.yaxis == "y2" for t in combined.data[3:])
 
+    def test_add_secondary_y_legend_anchored_to_container(self) -> None:
+        """Default layout anchors the legend to the figure container's right edge,
+        with automargin on the secondary y-axis so the axis title doesn't overlap."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="Precipitation")
+
+        combined = add_secondary_y(xpx(da1).line(), xpx(da2).bar())
+
+        assert combined.layout.legend.x == 1.0
+        assert combined.layout.legend.xanchor == "right"
+        assert combined.layout.legend.xref == "container"
+        assert combined.layout.legend.y == 1.0
+        assert combined.layout.legend.yanchor == "top"
+        # yref left as default ("paper") so legend top aligns with plot top,
+        # not figure top (avoids overlapping the figure title).
+        assert combined.layout.legend.yref != "container"
+        # Secondary axis reserves its own margin space.
+        assert combined.layout.yaxis2.automargin is True
+
+    def test_add_secondary_y_preserves_user_legend_position(self) -> None:
+        """User-set legend.x/y on the base figure is not overridden."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="Precipitation")
+
+        base = xpx(da1).line()
+        base.update_layout(legend={"x": 0.5, "y": 0.5})
+
+        combined = add_secondary_y(base, xpx(da2).bar())
+
+        assert combined.layout.legend.x == 0.5
+        assert combined.layout.legend.y == 0.5
+
     def test_add_secondary_y_after_overlay_keeps_secondary_visible(self) -> None:
         """overlay → add_secondary_y must not hide the secondary's traces."""
         da1 = xr.DataArray(

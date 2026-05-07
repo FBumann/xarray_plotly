@@ -583,6 +583,9 @@ def add_secondary_y(
             "showticklabels": is_rightmost,
             # Link non-rightmost axes to the rightmost for consistent scaling
             "matches": None if is_rightmost else rightmost_secondary_y,
+            # Reserve margin space for tick labels and title so the legend
+            # placed at x>=1 can't clip them.
+            "automargin": True,
         }
         # Remove None values
         axis_config = {k: v for k, v in axis_config.items() if v is not None}
@@ -605,7 +608,36 @@ def add_secondary_y(
         cross_source_dedup=False,
     )
     _fix_animation_axis_ranges(combined)
+    _set_default_secondary_y_layout(combined)
     return combined
+
+
+def _set_default_secondary_y_layout(fig: go.Figure) -> None:
+    """Anchor the legend to the figure container so it doesn't fight the
+    secondary y-axis for paper-coordinate space.
+
+    With ``xref="container"`` the legend's right edge sits at the figure's
+    right edge regardless of plot width.  Combined with ``automargin=True``
+    on the secondary y-axes (set in ``add_secondary_y``), Plotly reserves
+    space for the axis title between the plot and the legend, so the two
+    do not overlap.  Only fields the user has not already set are touched,
+    so explicit ``update_layout(legend=...)`` on the source figures wins.
+    """
+    legend_defaults: dict[str, Any] = {}
+    legend = fig.layout.legend
+    if legend.x is None:
+        # Container-relative x so the legend sits at the figure's right edge
+        # rather than fighting the secondary y-axis title for paper-coord space.
+        legend_defaults["x"] = 1.0
+        legend_defaults["xanchor"] = "right"
+        legend_defaults["xref"] = "container"
+    if legend.y is None:
+        # Paper-relative y so the legend top aligns with the plot top (below
+        # the figure title) — same vertical position Plotly uses by default.
+        legend_defaults["y"] = 1.0
+        legend_defaults["yanchor"] = "top"
+    if legend_defaults:
+        fig.update_layout(legend=legend_defaults)
 
 
 def _merge_secondary_y_frames(
