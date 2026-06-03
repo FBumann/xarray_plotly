@@ -443,8 +443,8 @@ class TestImshowFaceting:
         assert len(fig.data) == 3
         yaxes = [k for k in fig.layout if k.startswith("yaxis")]
         assert len(yaxes) == 3
-        annotations = {a.text for a in fig.layout.annotations}
-        assert annotations == {"scenario=a", "scenario=b", "scenario=c"}
+        facet_titles = {a.text for a in fig.layout.annotations if "=" in (a.text or "")}
+        assert facet_titles == {"scenario=a", "scenario=b", "scenario=c"}
 
     @requires_imshow_facet_row
     def test_imshow_facet_row_auto_4d(self) -> None:
@@ -452,8 +452,8 @@ class TestImshowFaceting:
         fig = self.da_4d.plotly.imshow()
         # 2 facet columns (scenario) x 3 facet rows (year)
         assert len(fig.data) == 6
-        annotations = {a.text for a in fig.layout.annotations}
-        assert annotations == {
+        facet_titles = {a.text for a in fig.layout.annotations if "=" in (a.text or "")}
+        assert facet_titles == {
             "scenario=low",
             "scenario=high",
             "year=2020",

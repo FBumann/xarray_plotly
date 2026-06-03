@@ -55,6 +55,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive line plot.
@@ -70,6 +71,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: sixth dimension.
             animation_frame: Dimension for animation. Default: seventh dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.line()`.
 
         Returns:
@@ -86,6 +89,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -100,6 +104,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive bar chart.
@@ -114,6 +119,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: fifth dimension.
             animation_frame: Dimension for animation. Default: sixth dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.bar()`.
 
         Returns:
@@ -129,6 +136,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -143,6 +151,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive stacked area chart.
@@ -157,6 +166,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: fifth dimension.
             animation_frame: Dimension for animation. Default: sixth dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.area()`.
 
         Returns:
@@ -172,6 +183,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -185,6 +197,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create a bar-like chart using stacked areas for better performance.
@@ -198,6 +211,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: fourth dimension.
             animation_frame: Dimension for animation. Default: fifth dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.area()`.
 
         Returns:
@@ -212,6 +227,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -227,6 +243,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive scatter plot.
@@ -246,6 +263,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: fifth dimension.
             animation_frame: Dimension for animation. Default: sixth dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.scatter()`.
 
         Returns:
@@ -262,6 +281,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -275,6 +295,7 @@ class DataArrayPlotlyAccessor:
         animation_frame: SlotValue = None,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive box plot.
@@ -291,6 +312,8 @@ class DataArrayPlotlyAccessor:
             facet_row: Dimension for subplot rows. Default: None (aggregated).
             animation_frame: Dimension for animation. Default: None (aggregated).
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.box()`.
 
         Returns:
@@ -305,6 +328,7 @@ class DataArrayPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -319,6 +343,7 @@ class DataArrayPlotlyAccessor:
         robust: bool = False,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive heatmap image.
@@ -340,6 +365,8 @@ class DataArrayPlotlyAccessor:
             animation_frame: Dimension for animation. Default: fifth dimension.
             robust: If True, use 2nd/98th percentiles for color bounds (handles outliers).
             colors: Color scale name (e.g., "Viridis", "RdBu"). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.imshow()`.
                 Use `zmin` and `zmax` to manually set color scale bounds.
 
@@ -356,6 +383,7 @@ class DataArrayPlotlyAccessor:
             robust=robust,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -368,6 +396,7 @@ class DataArrayPlotlyAccessor:
         facet_row: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive pie chart.
@@ -380,6 +409,8 @@ class DataArrayPlotlyAccessor:
             facet_col: Dimension for subplot columns. Default: second dimension.
             facet_row: Dimension for subplot rows. Default: third dimension.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.pie()`.
 
         Returns:
@@ -393,6 +424,7 @@ class DataArrayPlotlyAccessor:
             facet_row=facet_row,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -474,6 +506,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive line plot.
@@ -488,6 +521,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.line()`.
 
         Returns:
@@ -505,6 +540,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -520,6 +556,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive bar chart.
@@ -533,6 +570,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.bar()`.
 
         Returns:
@@ -549,6 +588,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -564,6 +604,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive stacked area chart.
@@ -577,6 +618,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.area()`.
 
         Returns:
@@ -593,6 +636,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -607,6 +651,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create a bar-like chart using stacked areas for better performance.
@@ -619,6 +664,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.area()`.
 
         Returns:
@@ -634,6 +681,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -650,6 +698,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive scatter plot.
@@ -664,6 +713,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.scatter()`.
 
         Returns:
@@ -681,6 +732,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -695,6 +747,7 @@ class DatasetPlotlyAccessor:
         animation_frame: SlotValue = None,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive box plot.
@@ -707,6 +760,8 @@ class DatasetPlotlyAccessor:
             facet_row: Dimension for subplot rows.
             animation_frame: Dimension for animation.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.box()`.
 
         Returns:
@@ -722,6 +777,7 @@ class DatasetPlotlyAccessor:
             animation_frame=animation_frame,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
 
@@ -735,6 +791,7 @@ class DatasetPlotlyAccessor:
         facet_row: SlotValue = auto,
         colors: Colors = None,
         facet_titles: FacetTitlesMode = "default",
+        shared_axis_labels: bool = True,
         **px_kwargs: Any,
     ) -> go.Figure:
         """Create an interactive pie chart.
@@ -746,6 +803,8 @@ class DatasetPlotlyAccessor:
             facet_col: Dimension for subplot columns.
             facet_row: Dimension for subplot rows.
             colors: Color specification (scale name, list, or dict). See module docs.
+            shared_axis_labels: If True (default), repeated axis titles on faceted
+                plots are replaced with a single shared, centered label per axis.
             **px_kwargs: Additional arguments passed to `plotly.express.pie()`.
 
         Returns:
@@ -760,5 +819,6 @@ class DatasetPlotlyAccessor:
             facet_row=facet_row,
             colors=colors,
             facet_titles=facet_titles,
+            shared_axis_labels=shared_axis_labels,
             **px_kwargs,
         )
