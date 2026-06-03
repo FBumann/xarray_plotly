@@ -971,3 +971,80 @@ def simplify_facet_titles(
         if text and _FACET_TITLE_PREFIX_RE.match(text):
             ann.text = text.split("=", 1)[1]
     return fig
+
+
+# Matches cartesian axis layout keys like "xaxis", "xaxis2", "yaxis12".
+_AXIS_KEY_RE = re.compile(r"([xy])axis\d*$")
+
+# Annotation specs identical to plotly's built-in shared subplot titles,
+# i.e. what `make_subplots(x_title=..., y_title=...)` produces.  Kept in
+# sync with plotly via a test against make_subplots output.
+_SHARED_LABEL_SPECS: dict[str, dict[str, Any]] = {
+    "x": {
+        "x": 0.5,
+        "y": 0,
+        "xref": "paper",
+        "yref": "paper",
+        "xanchor": "center",
+        "yanchor": "top",
+        "yshift": -30,
+        "showarrow": False,
+        "font": {"size": 16},
+    },
+    "y": {
+        "x": 0,
+        "y": 0.5,
+        "xref": "paper",
+        "yref": "paper",
+        "xanchor": "right",
+        "yanchor": "middle",
+        "xshift": -40,
+        "textangle": -90,
+        "showarrow": False,
+        "font": {"size": 16},
+    },
+}
+
+
+def share_axis_labels(fig: go.Figure) -> go.Figure:
+    """Replace repeated facet axis titles with a single shared label per axis.
+
+    Plotly Express repeats the x-axis title under every facet column and the
+    y-axis title beside every facet row.  This helper removes the repeated
+    titles and adds one centered label per axis instead, styled exactly like
+    plotly's built-in shared titles (``make_subplots(x_title=..., y_title=...)``),
+    which Plotly Express does not expose for faceted figures.
+
+    Titles are only collapsed when they are repeated and identical, so
+    figures without facets, figures combined from differently-labeled
+    subplots, and secondary-y figures are returned unchanged.
+
+    Args:
+        fig: A Plotly figure (mutated in place).
+
+    Returns:
+        The (possibly mutated) figure, for chaining.
+
+    Example:
+        >>> import plotly.express as px
+        >>> from xarray_plotly import share_axis_labels
+        >>> fig = px.line(df, x="year", y="gdp", facet_col="country", facet_row="metric")
+        >>> share_axis_labels(fig)  # one "year" below, one "gdp" at the left
+    """
+    axes_by_letter: dict[str, list[Any]] = {"x": [], "y": []}
+    for key in fig.layout:
+        match = _AXIS_KEY_RE.match(key)
+        # Overlaying axes (secondary y) share their domain with the axis
+        # they overlay; their titles are independent, not facet repetition.
+        if match and not fig.layout[key].overlaying:
+            axes_by_letter[match.group(1)].append(fig.layout[key])
+
+    for letter, axes in axes_by_letter.items():
+        titles = [axis.title.text for axis in axes if axis.title.text]
+        # Only collapse titles that are actually repeated and identical
+        if len(titles) < 2 or len(set(titles)) != 1:
+            continue
+        for axis in axes:
+            axis.title.text = None
+        fig.add_annotation(text=titles[0], **_SHARED_LABEL_SPECS[letter])
+    return fig

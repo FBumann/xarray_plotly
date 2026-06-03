@@ -26,12 +26,21 @@ from xarray_plotly.common import (
 )
 from xarray_plotly.figures import (
     _iter_all_traces,
+    share_axis_labels,
     simplify_facet_titles,
 )
 
 if TYPE_CHECKING:
     import plotly.graph_objects as go
     from xarray import DataArray
+
+
+def _finalize(fig: go.Figure, facet_titles: FacetTitlesMode, shared_axis_labels: bool) -> go.Figure:
+    """Apply facet post-processing shared by all plot functions."""
+    simplify_facet_titles(fig, facet_titles)
+    if shared_axis_labels:
+        share_axis_labels(fig)
+    return fig
 
 
 def line(
@@ -46,6 +55,7 @@ def line(
     animation_frame: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -79,6 +89,9 @@ def line(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.line()`.
 
@@ -116,7 +129,7 @@ def line(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def bar(
@@ -130,6 +143,7 @@ def bar(
     animation_frame: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -161,6 +175,9 @@ def bar(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.bar()`.
 
@@ -196,7 +213,7 @@ def bar(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def _classify_trace_sign(y_values: npt.ArrayLike) -> str:
@@ -293,6 +310,7 @@ def fast_bar(
     animation_frame: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -330,6 +348,9 @@ def fast_bar(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.area()`.
 
@@ -367,7 +388,7 @@ def fast_bar(
 
     _style_traces_as_bars(fig)
 
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def area(
@@ -381,6 +402,7 @@ def area(
     animation_frame: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -412,6 +434,9 @@ def area(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.area()`.
 
@@ -447,7 +472,7 @@ def area(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def box(
@@ -460,6 +485,7 @@ def box(
     animation_frame: SlotValue = None,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -491,6 +517,9 @@ def box(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.box()`.
 
@@ -525,7 +554,7 @@ def box(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def scatter(
@@ -540,6 +569,7 @@ def scatter(
     animation_frame: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -578,6 +608,9 @@ def scatter(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.scatter()`.
 
@@ -625,7 +658,7 @@ def scatter(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def _imshow_supports_facet_row() -> bool:
@@ -647,6 +680,7 @@ def imshow(
     robust: bool = False,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -689,6 +723,9 @@ def imshow(
         continuous scale (e.g., "Viridis", "RdBu"). Lists and dicts
         are not applicable for heatmaps.
         Explicit color_continuous_scale in px_kwargs takes precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.imshow()`.
         Use `zmin` and `zmax` to manually set color scale bounds.
@@ -752,7 +789,7 @@ def imshow(
         **facet_row_kwargs,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
 
 
 def pie(
@@ -764,6 +801,7 @@ def pie(
     facet_row: SlotValue = auto,
     colors: Colors = None,
     facet_titles: FacetTitlesMode = "default",
+    shared_axis_labels: bool = True,
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -790,6 +828,9 @@ def pie(
         - A list of colors (e.g., ["red", "blue", "green"])
         - A dict mapping values to colors (e.g., {"A": "red", "B": "blue"})
         Explicit color_* kwargs in px_kwargs take precedence.
+    shared_axis_labels
+        If True (default), repeated axis titles on faceted plots are
+        replaced with a single shared, centered label per axis.
     **px_kwargs
         Additional arguments passed to `plotly.express.pie()`.
 
@@ -823,4 +864,4 @@ def pie(
         labels=labels,
         **px_kwargs,
     )
-    return simplify_facet_titles(fig, facet_titles)
+    return _finalize(fig, facet_titles, shared_axis_labels)
