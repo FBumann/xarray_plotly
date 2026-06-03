@@ -20,6 +20,22 @@ class TestAssignSlots:
         slots = assign_slots(["lat", "lon"], "imshow")
         assert slots == {"y": "lat", "x": "lon"}
 
+    def test_auto_assignment_imshow_4d(self) -> None:
+        """Test that the fourth dimension fills facet_row for imshow."""
+        slots = assign_slots(["lat", "lon", "scenario", "year"], "imshow")
+        assert slots == {"y": "lat", "x": "lon", "facet_col": "scenario", "facet_row": "year"}
+
+    def test_auto_assignment_imshow_5d(self) -> None:
+        """Test that the fifth dimension fills animation_frame for imshow."""
+        slots = assign_slots(["lat", "lon", "scenario", "year", "time"], "imshow")
+        assert slots == {
+            "y": "lat",
+            "x": "lon",
+            "facet_col": "scenario",
+            "facet_row": "year",
+            "animation_frame": "time",
+        }
+
     def test_auto_assignment_scatter(self) -> None:
         """Test automatic positional assignment for scatter plots."""
         slots = assign_slots(["x_dim", "color_dim"], "scatter")
@@ -124,5 +140,6 @@ class TestSlotOrders:
             "y",
             "x",
             "facet_col",
+            "facet_row",
             "animation_frame",
         )
