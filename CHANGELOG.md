@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.17](https://github.com/FBumann/xarray_plotly/compare/v0.0.16...v0.0.17) (2026-06-03)
+
+
+### Features
+
+* **plotting:** shared axis labels for faceted plots ([#84](https://github.com/FBumann/xarray_plotly/issues/84)) ([5a3bef8](https://github.com/FBumann/xarray_plotly/commit/5a3bef863ce07dd1a1f69d79ece116c059782025))
+
 ## [0.0.16](https://github.com/FBumann/xarray_plotly/compare/v0.0.15...v0.0.16) (2026-06-03)
 
 
