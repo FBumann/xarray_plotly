@@ -5,12 +5,15 @@ Helper functions for combining and manipulating Plotly figures.
 from __future__ import annotations
 
 import copy
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import plotly.graph_objects as go
+
+    from xarray_plotly.common import FacetTitlesMode
 
 
 def _get_yaxis_title(fig: go.Figure) -> str:
@@ -921,4 +924,50 @@ def update_traces(
             if all(getattr(trace, k, None) == v for k, v in selector.items()):
                 trace.update(**kwargs)
 
+    return fig
+
+
+# Matches an identifier-style PX facet prefix like "country=" at the start of
+# annotation text.  Defensive: ignores annotations a user added themselves
+# whose text doesn't look like a dim assignment.
+_FACET_TITLE_PREFIX_RE = re.compile(r"^[A-Za-z_]\w*=")
+
+
+def simplify_facet_titles(
+    fig: go.Figure,
+    mode: FacetTitlesMode = "value",
+) -> go.Figure:
+    """Strip the ``<dim>=`` prefix from Plotly Express facet subplot titles.
+
+    PX renders faceted subplot titles as annotations like ``"country=Brazil"``.
+    With ``mode="value"`` (default), the prefix is stripped to just the value
+    (``"Brazil"``).  With ``mode="default"``, the figure is returned unchanged.
+
+    Only annotations whose text matches a Python-identifier prefix followed by
+    ``=`` are touched, so user-added annotations are left alone.
+
+    Args:
+        fig: A Plotly figure (mutated in place).
+        mode: ``"value"`` to strip the prefix, ``"default"`` to keep PX's format.
+
+    Returns:
+        The (possibly mutated) figure, for chaining.
+
+    Raises:
+        ValueError: If ``mode`` is not ``"value"`` or ``"default"``.
+
+    Example:
+        >>> from xarray_plotly import xpx, simplify_facet_titles
+        >>> fig = xpx(da).line(facet_col="country")
+        >>> simplify_facet_titles(fig)  # "country=Brazil" -> "Brazil"
+    """
+    if mode == "default":
+        return fig
+    if mode != "value":
+        raise ValueError(f"facet_titles must be 'value' or 'full', got {mode!r}")
+
+    for ann in fig.layout.annotations or ():
+        text = ann.text
+        if text and _FACET_TITLE_PREFIX_RE.match(text):
+            ann.text = text.split("=", 1)[1]
     return fig

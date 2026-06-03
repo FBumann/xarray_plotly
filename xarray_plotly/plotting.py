@@ -14,6 +14,7 @@ import plotly.express as px
 
 from xarray_plotly.common import (
     Colors,
+    FacetTitlesMode,
     SlotValue,
     assign_slots,
     auto,
@@ -25,6 +26,7 @@ from xarray_plotly.common import (
 )
 from xarray_plotly.figures import (
     _iter_all_traces,
+    simplify_facet_titles,
 )
 
 if TYPE_CHECKING:
@@ -43,6 +45,7 @@ def line(
     facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -100,7 +103,7 @@ def line(
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
 
-    return px.line(
+    fig = px.line(
         df,
         x=slots.get("x"),
         y=value_col,
@@ -113,6 +116,7 @@ def line(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def bar(
@@ -125,6 +129,7 @@ def bar(
     facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -179,7 +184,7 @@ def bar(
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
 
-    return px.bar(
+    fig = px.bar(
         df,
         x=slots.get("x"),
         y=value_col,
@@ -191,6 +196,7 @@ def bar(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def _classify_trace_sign(y_values: npt.ArrayLike) -> str:
@@ -286,6 +292,7 @@ def fast_bar(
     facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -360,7 +367,7 @@ def fast_bar(
 
     _style_traces_as_bars(fig)
 
-    return fig
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def area(
@@ -373,6 +380,7 @@ def area(
     facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -427,7 +435,7 @@ def area(
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
 
-    return px.area(
+    fig = px.area(
         df,
         x=slots.get("x"),
         y=value_col,
@@ -439,6 +447,7 @@ def area(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def box(
@@ -450,6 +459,7 @@ def box(
     facet_row: SlotValue = None,
     animation_frame: SlotValue = None,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -504,7 +514,7 @@ def box(
     value_col = get_value_col(darray)
     labels = {**build_labels(darray, slots, value_col), **px_kwargs.pop("labels", {})}
 
-    return px.box(
+    fig = px.box(
         df,
         x=slots.get("x"),
         y=value_col,
@@ -515,6 +525,7 @@ def box(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def scatter(
@@ -528,6 +539,7 @@ def scatter(
     facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -601,7 +613,7 @@ def scatter(
     if y_is_dim and str(y) not in labels:
         labels[str(y)] = get_label(darray, y)
 
-    return px.scatter(
+    fig = px.scatter(
         df,
         x=slots.get("x"),
         y=y_col,
@@ -613,6 +625,7 @@ def scatter(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def _imshow_supports_facet_row() -> bool:
@@ -633,6 +646,7 @@ def imshow(
     animation_frame: SlotValue = auto,
     robust: bool = False,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -731,13 +745,14 @@ def imshow(
         px_kwargs.setdefault("zmin", zmin)
         px_kwargs.setdefault("zmax", zmax)
 
-    return px.imshow(
+    fig = px.imshow(
         plot_data,
         facet_col=slots.get("facet_col"),
         animation_frame=slots.get("animation_frame"),
         **facet_row_kwargs,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)
 
 
 def pie(
@@ -748,6 +763,7 @@ def pie(
     facet_col: SlotValue = auto,
     facet_row: SlotValue = auto,
     colors: Colors = None,
+    facet_titles: FacetTitlesMode = "default",
     **px_kwargs: Any,
 ) -> go.Figure:
     """
@@ -797,7 +813,7 @@ def pie(
     # Use names dimension for color if not explicitly set
     color_col = color if color is not None else slots.get("names")
 
-    return px.pie(
+    fig = px.pie(
         df,
         names=slots.get("names"),
         values=value_col,
@@ -807,3 +823,4 @@ def pie(
         labels=labels,
         **px_kwargs,
     )
+    return simplify_facet_titles(fig, facet_titles)

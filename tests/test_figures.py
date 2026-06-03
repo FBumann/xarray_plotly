@@ -9,7 +9,13 @@ import plotly.graph_objects as go
 import pytest
 import xarray as xr
 
-from xarray_plotly import add_secondary_y, overlay, subplots, xpx
+from xarray_plotly import (
+    add_secondary_y,
+    overlay,
+    simplify_facet_titles,
+    subplots,
+    xpx,
+)
 
 
 class TestOverlayBasic:
@@ -922,3 +928,64 @@ class TestSubplotsValidation:
         original_count = len(fig.data)
         _ = subplots(fig, fig, cols=2)
         assert len(fig.data) == original_count
+
+
+class TestSimplifyFacetTitles:
+    """Tests for the simplify_facet_titles helper and the `facet_titles` kwarg."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+        self.da = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "country"],
+            coords={"country": ["United States", "China", "Brazil"]},
+            name="value",
+        )
+
+    def test_helper_strips_dim_prefix(self) -> None:
+        fig = xpx(self.da).line(facet_col="country")
+        # PX writes annotations like "country=United States"
+        original_texts = [a.text for a in fig.layout.annotations]
+        assert any(t and t.startswith("country=") for t in original_texts)
+
+        simplify_facet_titles(fig)
+
+        for ann in fig.layout.annotations:
+            if ann.text:
+                assert "=" not in ann.text or ann.text.split("=", 1)[0] != "country"
+
+    def test_helper_full_is_noop(self) -> None:
+        fig = xpx(self.da).line(facet_col="country")
+        before = [a.text for a in fig.layout.annotations]
+        simplify_facet_titles(fig, mode="default")
+        after = [a.text for a in fig.layout.annotations]
+        assert before == after
+
+    def test_helper_invalid_mode_raises(self) -> None:
+        fig = xpx(self.da).line(facet_col="country")
+        with pytest.raises(ValueError, match="facet_titles must be"):
+            simplify_facet_titles(fig, mode="bogus")  # type: ignore[arg-type]
+
+    def test_helper_leaves_user_annotations_alone(self) -> None:
+        """User-added annotations without a Python-identifier prefix are preserved."""
+        fig = xpx(self.da).line(facet_col="country")
+        fig.add_annotation(text="Some note", x=0, y=0, showarrow=False)
+        simplify_facet_titles(fig)
+        texts = [a.text for a in fig.layout.annotations]
+        assert "Some note" in texts
+
+    def test_kwarg_default_keeps_px_format(self) -> None:
+        fig = xpx(self.da).line(facet_col="country")
+        # At least one annotation still carries the dim= prefix.
+        assert any(a.text and a.text.startswith("country=") for a in fig.layout.annotations)
+
+    def test_kwarg_value_strips_prefix(self) -> None:
+        fig = xpx(self.da).line(facet_col="country", facet_titles="value")
+        for ann in fig.layout.annotations:
+            if ann.text:
+                # Should not start with "country="; the dim prefix is stripped.
+                assert not ann.text.startswith("country=")
+
+    def test_kwarg_invalid_raises(self) -> None:
+        with pytest.raises(ValueError, match="facet_titles must be"):
+            xpx(self.da).line(facet_col="country", facet_titles="bogus")  # type: ignore[arg-type]
