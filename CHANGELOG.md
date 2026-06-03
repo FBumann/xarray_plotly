@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.16](https://github.com/FBumann/xarray_plotly/compare/v0.0.15...v0.0.16) (2026-06-03)
+
+
+### Features
+
+* **imshow:** support facet_row for subplot rows (plotly&gt;=6.7) ([#82](https://github.com/FBumann/xarray_plotly/issues/82)) ([55b503b](https://github.com/FBumann/xarray_plotly/commit/55b503b37d598c845631c7b35adcea3a8f1e3ed9))
+* **plotting:** add facet_titles kwarg to strip dim= prefix ([#77](https://github.com/FBumann/xarray_plotly/issues/77)) ([1433a95](https://github.com/FBumann/xarray_plotly/commit/1433a95c45cacb5f49c35e6f63794d668f6278ab))
+
 ## [0.0.15](https://github.com/FBumann/xarray_plotly/compare/v0.0.14...v0.0.15) (2026-03-23)
 
 
