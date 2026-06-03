@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
     import plotly.graph_objects as go
 
+    from xarray_plotly.common import LegendMode
+
 
 def _get_yaxis_title(fig: go.Figure) -> str:
     """Extract the primary y-axis title text from a figure.
@@ -28,28 +30,66 @@ def _get_yaxis_title(fig: go.Figure) -> str:
         return ""
 
 
+def _dedup_legend_within_traces(traces: list[Any]) -> None:
+    """Ensure one ``showlegend=True`` per ``legendgroup`` among the given traces."""
+    from collections import defaultdict
+
+    grouped: dict[str, list[Any]] = defaultdict(list)
+    ungrouped: list[Any] = []
+
+    for trace in traces:
+        lg = getattr(trace, "legendgroup", None) or ""
+        if lg:
+            grouped[lg].append(trace)
+        else:
+            ungrouped.append(trace)
+
+    for group_traces in grouped.values():
+        has_visible = False
+        for t in group_traces:
+            if has_visible:
+                t.showlegend = False
+            elif getattr(t, "name", None):
+                t.showlegend = True
+                has_visible = True
+
+    for trace in ungrouped:
+        if getattr(trace, "name", None):
+            trace.showlegend = True
+
+
 def _ensure_legend_visibility(
     combined: go.Figure,
     source_figs: list[go.Figure],
     trace_slices: list[slice],
+    *,
+    mode: LegendMode = "merge",
 ) -> None:
     """Fix legend visibility on a combined figure.
 
-    Handles three problems that arise when combining Plotly Express figures:
+    Three modes control how same-named traces from different source figures
+    are presented in the legend:
 
-    1. **Unnamed traces** — PX sets ``name=""`` on single-trace (no color)
-       figures.  We derive a name from each source figure's y-axis title.
-    2. **Hidden named traces** — PX sets ``showlegend=False`` on single-trace
-       figures.  We ensure at least one trace per ``legendgroup`` (or each
-       ungrouped named trace) has ``showlegend=True``.
-    3. **Duplicate legend entries** — when two source figures share the same
-       ``legendgroup`` names, we deduplicate so only the first trace per
-       group shows in the legend.
+    - ``"merge"``: traces sharing a ``legendgroup`` collapse to a single
+       legend entry (with one ``showlegend=True``).  The default for
+       ``overlay`` and for ``add_secondary_y(legend="merge")``.
+    - ``"suffix"``: colliding ``legendgroup`` names across slices are
+       namespaced with the source figure's y-axis title, so each trace
+       becomes its own legend entry (e.g. ``"Brazil (Population)"`` and
+       ``"Brazil (GDP per Capita)"``).
+    - ``"separate"``: each source figure's traces are deduped only within
+       that source.  Across sources, duplicate names are accepted as-is.
+
+    All three modes also:
+      * Label unnamed traces using each source figure's y-axis title.
+      * Propagate name/legendgroup/style to animation frame traces, since
+        Plotly overwrites these on each frame.
 
     Args:
         combined: The combined Plotly figure (mutated in place).
         source_figs: The original source figures, in trace order.
         trace_slices: Slices into ``combined.data`` for each source figure.
+        mode: How to handle cross-source legend entries.
     """
     from collections import defaultdict
 
@@ -70,30 +110,46 @@ def _ensure_legend_visibility(
                 trace.legendgroup = label
 
     # --- Step 2 & 3: fix showlegend per legendgroup -----------------------
-    grouped: dict[str, list[Any]] = defaultdict(list)
-    ungrouped: list[Any] = []
+    if mode == "merge":
+        _dedup_legend_within_traces(list(combined.data))
+    elif mode == "suffix":
+        # Namespace legendgroups that collide across slices, so each source
+        # keeps its own legend entries instead of being deduped away.
+        slice_groups: list[set[str]] = []
+        for sl in trace_slices:
+            groups: set[str] = set()
+            for t in combined.data[sl]:
+                lg = getattr(t, "legendgroup", None)
+                if lg:
+                    groups.add(lg)
+            slice_groups.append(groups)
+        group_counts: dict[str, int] = defaultdict(int)
+        for sg in slice_groups:
+            for g in sg:
+                group_counts[g] += 1
+        colliding = {g for g, cnt in group_counts.items() if cnt > 1}
 
-    for trace in combined.data:
-        lg = getattr(trace, "legendgroup", None) or ""
-        if lg:
-            grouped[lg].append(trace)
-        else:
-            ungrouped.append(trace)
+        for label, sl in zip(labels, trace_slices, strict=False):
+            if not label:
+                continue
+            for trace in combined.data[sl]:
+                lg = getattr(trace, "legendgroup", None)
+                if lg and lg in colliding:
+                    new_lg = f"{lg} ({label})"
+                    trace.legendgroup = new_lg
+                    if getattr(trace, "name", None) == lg:
+                        trace.name = new_lg
 
-    for traces in grouped.values():
-        has_visible = False
-        for t in traces:
-            if has_visible:
-                # Deduplicate: only first keeps showlegend
-                t.showlegend = False
-            elif getattr(t, "name", None):
-                t.showlegend = True
-                has_visible = True
-
-    # Ungrouped traces with a name should show in the legend
-    for trace in ungrouped:
-        if getattr(trace, "name", None):
-            trace.showlegend = True
+        for sl in trace_slices:
+            _dedup_legend_within_traces(list(combined.data[sl]))
+    elif mode == "separate":
+        # Dedup only within each source slice.  Cross-source duplicates are
+        # left visible — same-named traces from different figures appear as
+        # distinct legend entries (with possibly identical names).
+        for sl in trace_slices:
+            _dedup_legend_within_traces(list(combined.data[sl]))
+    else:
+        raise ValueError(f"legend mode must be 'suffix', 'merge', or 'separate', got {mode!r}")
 
     # --- Step 4: propagate style properties to animation frame traces ------
     # When Plotly animates, frame trace data overwrites fig.data properties.
@@ -436,6 +492,7 @@ def add_secondary_y(
     secondary: go.Figure,
     *,
     secondary_y_title: str | None = None,
+    legend: LegendMode = "suffix",
 ) -> go.Figure:
     """Add a secondary y-axis with traces from another figure.
 
@@ -449,6 +506,13 @@ def add_secondary_y(
         secondary: The figure whose traces use the secondary y-axis (right).
         secondary_y_title: Optional title for the secondary y-axis.
             If not provided, uses the secondary figure's y-axis title.
+        legend: How to handle same-named traces across the two figures.
+            ``"suffix"`` (default) gives each trace its own legend entry
+            with the source figure's y-axis title appended.  ``"merge"``
+            collapses same-named traces into a single legend entry that
+            toggles both axes together.  ``"separate"`` leaves PX legend
+            output untouched, accepting duplicate names across the two
+            figures.
 
     Returns:
         A new figure with both primary and secondary y-axes.
@@ -475,6 +539,9 @@ def add_secondary_y(
         >>> fig1 = xpx(data).line(facet_col="facet")
         >>> fig2 = xpx(data * 100).bar(facet_col="facet")  # Different scale
         >>> combined = add_secondary_y(fig1, fig2)
+        >>>
+        >>> # Click "Brazil" in the legend toggles both Population and GDP traces
+        >>> combined = add_secondary_y(fig1, fig2, legend="merge")
     """
     import plotly.graph_objects as go
 
@@ -538,6 +605,9 @@ def add_secondary_y(
             "showticklabels": is_rightmost,
             # Link non-rightmost axes to the rightmost for consistent scaling
             "matches": None if is_rightmost else rightmost_secondary_y,
+            # Reserve margin space for tick labels and title so the legend
+            # placed at x>=1 can't clip them.
+            "automargin": True,
         }
         # Remove None values
         axis_config = {k: v for k, v in axis_config.items() if v is not None}
@@ -557,9 +627,39 @@ def add_secondary_y(
         combined,
         [base, secondary],
         [slice(0, base_n), slice(base_n, base_n + sec_n)],
+        mode=legend,
     )
     _fix_animation_axis_ranges(combined)
+    _set_default_secondary_y_layout(combined)
     return combined
+
+
+def _set_default_secondary_y_layout(fig: go.Figure) -> None:
+    """Anchor the legend to the figure container so it doesn't fight the
+    secondary y-axis for paper-coordinate space.
+
+    With ``xref="container"`` the legend's right edge sits at the figure's
+    right edge regardless of plot width.  Combined with ``automargin=True``
+    on the secondary y-axes (set in ``add_secondary_y``), Plotly reserves
+    space for the axis title between the plot and the legend, so the two
+    do not overlap.  Only fields the user has not already set are touched,
+    so explicit ``update_layout(legend=...)`` on the source figures wins.
+    """
+    legend_defaults: dict[str, Any] = {}
+    legend = fig.layout.legend
+    if legend.x is None:
+        # Container-relative x so the legend sits at the figure's right edge
+        # rather than fighting the secondary y-axis title for paper-coord space.
+        legend_defaults["x"] = 1.0
+        legend_defaults["xanchor"] = "right"
+        legend_defaults["xref"] = "container"
+    if legend.y is None:
+        # Paper-relative y so the legend top aligns with the plot top (below
+        # the figure title) — same vertical position Plotly uses by default.
+        legend_defaults["y"] = 1.0
+        legend_defaults["yanchor"] = "top"
+    if legend_defaults:
+        fig.update_layout(legend=legend_defaults)
 
 
 def _merge_secondary_y_frames(

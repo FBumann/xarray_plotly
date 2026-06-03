@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import warnings
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import plotly.express as px
 
@@ -37,6 +37,21 @@ Colors = str | Sequence[str] | Mapping[str, str] | None
 - Sequence[str]: List of colors for discrete sequence (e.g., ["red", "blue"])
 - Mapping[str, str]: Explicit mapping of values to colors (e.g., {"A": "red"})
 - None: Use Plotly defaults
+"""
+
+LegendMode = Literal["suffix", "merge", "separate"]
+"""Type alias for the legend kwarg on ``add_secondary_y``.
+
+- ``"suffix"`` (default): each trace gets its own legend entry with the
+  source figure's y-axis title appended, e.g. ``"Brazil (Population)"``
+  and ``"Brazil (GDP per Capita)"``. Every trace toggles independently.
+- ``"merge"``: same-named traces across the two figures share a
+  legendgroup, collapsing to one legend entry per name.  Clicking the
+  entry toggles both axes together (Plotly's default
+  ``legend.groupclick="togglegroup"``).
+- ``"separate"``: leave Plotly Express legend output untouched,
+  accepting duplicate names across the two figures.  Each trace
+  toggles alone.
 """
 
 # Re-export for backward compatibility

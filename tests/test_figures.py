@@ -703,6 +703,127 @@ class TestLegendVisibility:
         assert combined.data[0].showlegend is True
         assert combined.data[1].showlegend is True
 
+    def _multi_trace_pair(self) -> tuple[xr.DataArray, xr.DataArray]:
+        da1 = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var1",
+        )
+        da2 = xr.DataArray(
+            np.random.rand(10, 3) * 100,
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var2",
+        )
+        return da1, da2
+
+    def test_add_secondary_y_legend_suffix_default(self) -> None:
+        """legend="suffix" (default) gives every trace its own entry, names suffixed."""
+        da1, da2 = self._multi_trace_pair()
+        combined = add_secondary_y(xpx(da1).line(), xpx(da2).line())
+
+        # All 6 traces visible with distinct legendgroups.
+        assert all(t.showlegend is True for t in combined.data)
+        legendgroups = [t.legendgroup for t in combined.data]
+        assert len(set(legendgroups)) == len(legendgroups)
+        # Names suffixed with the source y-axis title.
+        for t in combined.data[:3]:
+            assert t.name.endswith("(Var1)")
+        for t in combined.data[3:]:
+            assert t.name.endswith("(Var2)")
+        # Axis routing preserved.
+        assert all(t.yaxis == "y" for t in combined.data[:3])
+        assert all(t.yaxis == "y2" for t in combined.data[3:])
+
+    def test_add_secondary_y_legend_merge(self) -> None:
+        """legend="merge" collapses same-named traces to a single legend entry."""
+        da1, da2 = self._multi_trace_pair()
+        combined = add_secondary_y(xpx(da1).line(), xpx(da2).line(), legend="merge")
+
+        # 3 visible entries (one per cat), names not suffixed, both axes share legendgroup.
+        visible = [t for t in combined.data if t.showlegend]
+        assert len(visible) == 3
+        assert {t.name for t in visible} == {"a", "b", "c"}
+        # Each cat's two traces share a legendgroup so togglegroup toggles both.
+        for cat in ("a", "b", "c"):
+            members = [t for t in combined.data if t.legendgroup == cat]
+            assert len(members) == 2
+
+    def test_add_secondary_y_legend_separate(self) -> None:
+        """legend="separate" keeps PX entries as-is, accepting duplicate names."""
+        da1, da2 = self._multi_trace_pair()
+        combined = add_secondary_y(xpx(da1).line(), xpx(da2).line(), legend="separate")
+
+        # All 6 traces stay visible.
+        assert all(t.showlegend is True for t in combined.data)
+        # Names are duplicated across the two sources, not suffixed.
+        names = [t.name for t in combined.data]
+        assert names == ["a", "b", "c", "a", "b", "c"]
+
+    def test_add_secondary_y_legend_invalid_raises(self) -> None:
+        da1, da2 = self._multi_trace_pair()
+        with pytest.raises(ValueError, match="legend mode must be"):
+            add_secondary_y(xpx(da1).line(), xpx(da2).line(), legend="bogus")  # type: ignore[arg-type]
+
+    def test_add_secondary_y_legend_anchored_to_container(self) -> None:
+        """Default layout anchors the legend to the figure container's right edge,
+        with automargin on the secondary y-axis so the axis title doesn't overlap."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="Precipitation")
+
+        combined = add_secondary_y(xpx(da1).line(), xpx(da2).bar())
+
+        assert combined.layout.legend.x == 1.0
+        assert combined.layout.legend.xanchor == "right"
+        assert combined.layout.legend.xref == "container"
+        assert combined.layout.legend.y == 1.0
+        assert combined.layout.legend.yanchor == "top"
+        # yref left as default ("paper") so legend top aligns with plot top,
+        # not figure top (avoids overlapping the figure title).
+        assert combined.layout.legend.yref != "container"
+        # Secondary axis reserves its own margin space.
+        assert combined.layout.yaxis2.automargin is True
+
+    def test_add_secondary_y_preserves_user_legend_position(self) -> None:
+        """User-set legend.x/y on the base figure is not overridden."""
+        da1 = xr.DataArray([1, 2, 3], dims=["x"], name="Temperature")
+        da2 = xr.DataArray([100, 200, 300], dims=["x"], name="Precipitation")
+
+        base = xpx(da1).line()
+        base.update_layout(legend={"x": 0.5, "y": 0.5})
+
+        combined = add_secondary_y(base, xpx(da2).bar())
+
+        assert combined.layout.legend.x == 0.5
+        assert combined.layout.legend.y == 0.5
+
+    def test_add_secondary_y_after_overlay_keeps_secondary_visible(self) -> None:
+        """overlay → add_secondary_y must not hide the secondary's traces."""
+        da1 = xr.DataArray(
+            np.random.rand(10, 3),
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var1",
+        )
+        da2 = xr.DataArray(
+            np.random.rand(10, 3) * 100,
+            dims=["x", "cat"],
+            coords={"cat": ["a", "b", "c"]},
+            name="Var2",
+        )
+        fig1 = xpx(da1).line()
+        fig2 = xpx(da1).area()
+        overlaid = overlay(fig1, fig2)
+        fig3 = xpx(da2).line()
+
+        combined = add_secondary_y(overlaid, fig3)
+
+        # Secondary traces (last 3) must all be visible in the legend.
+        for t in combined.data[-3:]:
+            assert t.showlegend is True
+            assert t.yaxis == "y2"
+
     def test_overlay_faceted_legendgroup_dedup(self) -> None:
         """Faceted overlay keeps only one showlegend=True per legendgroup."""
         da = xr.DataArray(
