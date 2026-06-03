@@ -4,6 +4,7 @@ Plotly Express plotting functions for DataArray objects.
 
 from __future__ import annotations
 
+import inspect
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -614,12 +615,21 @@ def scatter(
     )
 
 
+def _imshow_supports_facet_row() -> bool:
+    """Check whether the installed plotly version supports facet_row in px.imshow.
+
+    Support was added in plotly 6.7.0.
+    """
+    return "facet_row" in inspect.signature(px.imshow).parameters
+
+
 def imshow(
     darray: DataArray,
     *,
     x: SlotValue = auto,
     y: SlotValue = auto,
     facet_col: SlotValue = auto,
+    facet_row: SlotValue = auto,
     animation_frame: SlotValue = auto,
     robust: bool = False,
     colors: Colors = None,
@@ -629,7 +639,7 @@ def imshow(
     Create an interactive heatmap from a DataArray.
 
     Both x and y are dimensions. Dimensions fill slots in order:
-    y (rows) -> x (columns) -> facet_col -> animation_frame
+    y (rows) -> x (columns) -> facet_col -> facet_row -> animation_frame
 
     .. note::
         **Difference from plotly.express.imshow**: By default, color bounds
@@ -649,8 +659,14 @@ def imshow(
         Dimension for y-axis (rows). Default: first dimension.
     facet_col
         Dimension for subplot columns. Default: third dimension.
+    facet_row
+        Dimension for subplot rows. Default: fourth dimension.
+        Requires plotly>=6.7.0; on older versions this slot is skipped
+        during auto-assignment (the fourth dimension animates instead).
+        Note: ``facet_col_wrap`` is ignored by plotly when ``facet_row``
+        is set.
     animation_frame
-        Dimension for animation. Default: fourth dimension.
+        Dimension for animation. Default: fifth dimension.
     robust
         If True, compute color bounds using 2nd and 98th percentiles
         for robustness against outliers. Default: False (uses min/max).
@@ -668,18 +684,36 @@ def imshow(
     plotly.graph_objects.Figure
     """
     px_kwargs = resolve_colors(colors, px_kwargs)
+
+    # On plotly < 6.7.0, px.imshow has no facet_row: skip auto-assignment so
+    # dimensions fall through to animation_frame instead.
+    if facet_row is auto and not _imshow_supports_facet_row():
+        facet_row = None
+
     slots = assign_slots(
         list(darray.dims),
         "imshow",
         y=y,
         x=x,
         facet_col=facet_col,
+        facet_row=facet_row,
         animation_frame=animation_frame,
     )
 
-    # Transpose to: y (rows), x (cols), facet_col, animation_frame
+    facet_row_kwargs: dict[str, Any] = {}
+    if slots.get("facet_row") is not None:
+        if not _imshow_supports_facet_row():
+            import plotly
+
+            msg = f"facet_row for imshow requires plotly>=6.7.0 (installed: {plotly.__version__})."
+            raise ValueError(msg)
+        facet_row_kwargs["facet_row"] = slots["facet_row"]
+
+    # Transpose to: y (rows), x (cols), facet_col, facet_row, animation_frame
     transpose_order = [
-        slots[k] for k in ("y", "x", "facet_col", "animation_frame") if slots.get(k) is not None
+        slots[k]
+        for k in ("y", "x", "facet_col", "facet_row", "animation_frame")
+        if slots.get(k) is not None
     ]
     plot_data = darray.transpose(*transpose_order) if transpose_order else darray
 
@@ -701,6 +735,7 @@ def imshow(
         plot_data,
         facet_col=slots.get("facet_col"),
         animation_frame=slots.get("animation_frame"),
+        **facet_row_kwargs,
         **px_kwargs,
     )
 

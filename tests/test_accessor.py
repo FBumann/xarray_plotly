@@ -9,7 +9,8 @@ import pytest
 import xarray as xr
 
 import xarray_plotly  # noqa: F401 - registers accessor
-from xarray_plotly import xpx
+from xarray_plotly import plotting, xpx
+from xarray_plotly.plotting import _imshow_supports_facet_row
 
 
 class TestXpxFunction:
@@ -401,6 +402,107 @@ class TestImshowBounds:
         coloraxis = fig.layout.coloraxis
         assert coloraxis.cmin == 0.0
         assert coloraxis.cmax == 70.0
+
+
+requires_imshow_facet_row = pytest.mark.skipif(
+    not _imshow_supports_facet_row(),
+    reason="facet_row in px.imshow requires plotly>=6.7.0",
+)
+
+
+class TestImshowFaceting:
+    """Tests for imshow facet_col and facet_row."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+        """Set up test data."""
+        self.da_3d = xr.DataArray(
+            np.random.rand(4, 5, 3),
+            dims=["lat", "lon", "scenario"],
+            coords={"scenario": ["a", "b", "c"]},
+            name="temperature",
+        )
+        self.da_4d = xr.DataArray(
+            np.random.rand(4, 5, 2, 3),
+            dims=["lat", "lon", "scenario", "year"],
+            coords={"scenario": ["low", "high"], "year": [2020, 2021, 2022]},
+            name="temperature",
+        )
+
+    def test_imshow_facet_col(self) -> None:
+        """Test imshow with facet_col creates one subplot per value."""
+        fig = self.da_3d.plotly.imshow()
+        assert len(fig.data) == 3
+        xaxes = [k for k in fig.layout if k.startswith("xaxis")]
+        assert len(xaxes) == 3
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_row_explicit(self) -> None:
+        """Test imshow with explicit facet_row creates one subplot row per value."""
+        fig = self.da_3d.plotly.imshow(facet_col=None, facet_row="scenario")
+        assert len(fig.data) == 3
+        yaxes = [k for k in fig.layout if k.startswith("yaxis")]
+        assert len(yaxes) == 3
+        annotations = {a.text for a in fig.layout.annotations}
+        assert annotations == {"scenario=a", "scenario=b", "scenario=c"}
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_row_auto_4d(self) -> None:
+        """Test that a 4D array auto-assigns facet_col and facet_row."""
+        fig = self.da_4d.plotly.imshow()
+        # 2 facet columns (scenario) x 3 facet rows (year)
+        assert len(fig.data) == 6
+        annotations = {a.text for a in fig.layout.annotations}
+        assert annotations == {
+            "scenario=low",
+            "scenario=high",
+            "year=2020",
+            "year=2021",
+            "year=2022",
+        }
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_grid_consistent_bounds(self) -> None:
+        """Test that facet grid subplots share global color bounds."""
+        da = xr.DataArray(
+            np.arange(24, dtype=float).reshape(2, 2, 2, 3),
+            dims=["y", "x", "scenario", "year"],
+        )
+        fig = da.plotly.imshow()
+        coloraxis = fig.layout.coloraxis
+        assert coloraxis.cmin == 0.0
+        assert coloraxis.cmax == 23.0
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_grid_with_animation(self) -> None:
+        """Test imshow with facet_col, facet_row, and animation_frame together."""
+        da = xr.DataArray(
+            np.random.rand(4, 5, 2, 3, 6),
+            dims=["lat", "lon", "scenario", "year", "time"],
+            name="temperature",
+        )
+        fig = da.plotly.imshow()
+        assert len(fig.data) == 6
+        assert len(fig.frames) == 6
+
+    def test_imshow_explicit_facet_row_unsupported_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test informative error when facet_row is requested on old plotly."""
+        monkeypatch.setattr(plotting, "_imshow_supports_facet_row", lambda: False)
+        with pytest.raises(ValueError, match=r"facet_row for imshow requires plotly>=6\.7\.0"):
+            self.da_3d.plotly.imshow(facet_col=None, facet_row="scenario")
+
+    def test_imshow_auto_skips_facet_row_on_old_plotly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that auto-assignment skips facet_row on old plotly (4th dim animates)."""
+        monkeypatch.setattr(plotting, "_imshow_supports_facet_row", lambda: False)
+        fig = self.da_4d.plotly.imshow()
+        # year (4th dim) falls through to animation_frame instead of facet_row
+        assert len(fig.frames) == 3
+        # only the facet_col (scenario) produces subplots
+        assert len(fig.data) == 2
 
 
 class TestColorsParameter:

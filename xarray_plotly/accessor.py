@@ -302,6 +302,7 @@ class DataArrayPlotlyAccessor:
         x: SlotValue = auto,
         y: SlotValue = auto,
         facet_col: SlotValue = auto,
+        facet_row: SlotValue = auto,
         animation_frame: SlotValue = auto,
         robust: bool = False,
         colors: Colors = None,
@@ -309,7 +310,7 @@ class DataArrayPlotlyAccessor:
     ) -> go.Figure:
         """Create an interactive heatmap image.
 
-        Slot order: y (rows) -> x (columns) -> facet_col -> animation_frame
+        Slot order: y (rows) -> x (columns) -> facet_col -> facet_row -> animation_frame
 
         Note:
             **Difference from px.imshow**: Color bounds are computed from the
@@ -320,7 +321,10 @@ class DataArrayPlotlyAccessor:
             x: Dimension for x-axis (columns). Default: second dimension.
             y: Dimension for y-axis (rows). Default: first dimension.
             facet_col: Dimension for subplot columns. Default: third dimension.
-            animation_frame: Dimension for animation. Default: fourth dimension.
+            facet_row: Dimension for subplot rows. Default: fourth dimension.
+                Requires plotly>=6.7.0; on older versions this slot is skipped
+                during auto-assignment.
+            animation_frame: Dimension for animation. Default: fifth dimension.
             robust: If True, use 2nd/98th percentiles for color bounds (handles outliers).
             colors: Color scale name (e.g., "Viridis", "RdBu"). See module docs.
             **px_kwargs: Additional arguments passed to `plotly.express.imshow()`.
@@ -334,6 +338,7 @@ class DataArrayPlotlyAccessor:
             x=x,
             y=y,
             facet_col=facet_col,
+            facet_row=facet_row,
             animation_frame=animation_frame,
             robust=robust,
             colors=colors,
