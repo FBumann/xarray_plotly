@@ -38,7 +38,7 @@ jobs:
         run: uv run pytest --cov=xarray_plotly --cov-report=xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         if: matrix.python-version == '3.12'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
