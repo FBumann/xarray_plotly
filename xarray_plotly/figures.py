@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import numpy as np
+    import numpy.typing as npt
     import plotly.graph_objects as go
 
     from xarray_plotly.common import FacetTitlesMode
@@ -114,7 +115,7 @@ def _ensure_legend_visibility(
                         setattr(frame_trace, attr, src_val)
 
 
-def _numeric_values(vals: Any) -> np.ndarray | None:
+def _numeric_values(vals: Any) -> npt.NDArray[np.float64] | None:
     """Convert trace data to a 1-D float array, or None if not numeric.
 
     Datetime/timedelta and categorical (string) data return None — those
