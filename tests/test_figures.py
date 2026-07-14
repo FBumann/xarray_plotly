@@ -797,6 +797,149 @@ class TestAnimationAxisRanges:
         lo, _hi = combined.layout.yaxis.range
         assert lo <= 0, f"Bar y-axis range should include 0, got lo={lo}"
 
+    def test_x_axis_stays_on_autorange_when_frames_share_extent(self) -> None:
+        """x-axis must not be pinned when every frame spans the same x values.
+
+        Pinning it froze a numeric range that became a garbage category-index
+        range if the user later switched the axis to type='category'.
+        """
+        da = xr.DataArray(
+            np.random.rand(4, 3, 2),
+            dims=["period", "tech", "case"],
+            coords={"period": [2025, 2030, 2035, 2040]},
+            name="heat",
+        )
+        line_da = xr.DataArray(
+            np.random.rand(4, 2) * 200,
+            dims=["period", "case"],
+            coords={"period": [2025, 2030, 2035, 2040]},
+            name="demand",
+        )
+        combined = overlay(
+            xpx(da).bar(x="period", barmode="relative", animation_frame="case"),
+            xpx(line_da).line(animation_frame="case"),
+        )
+
+        # Same periods in every frame: initial autorange stays valid
+        assert combined.layout.xaxis.range is None
+        # y differs per frame, so it should be pinned
+        assert combined.layout.yaxis.range is not None
+
+    def test_no_axis_pinned_when_frames_identical(self) -> None:
+        """Nothing is pinned when all frames have identical data extents."""
+        da = xr.DataArray(
+            np.array([[1.0, 5.0], [1.0, 5.0], [1.0, 5.0]]).T,
+            dims=["x", "frame"],
+            name="val",
+        )
+        combined = overlay(
+            xpx(da).line(animation_frame="frame"),
+            xpx(da).scatter(animation_frame="frame"),
+        )
+
+        assert combined.layout.xaxis.range is None
+        assert combined.layout.yaxis.range is None
+
+    def test_y_axis_pinned_when_later_frame_exceeds_initial(self) -> None:
+        """y-axis is pinned to cover a later frame with larger values."""
+        da = xr.DataArray(
+            np.array([[1.0, 100.0], [2.0, 200.0], [3.0, 300.0]]),
+            dims=["x", "frame"],
+            name="val",
+        )
+        combined = overlay(
+            xpx(da).line(animation_frame="frame"),
+            xpx(da).scatter(animation_frame="frame"),
+        )
+
+        lo, hi = combined.layout.yaxis.range
+        assert lo <= 1.0
+        assert hi >= 300.0
+
+    def test_stacked_bars_range_covers_summed_height(self) -> None:
+        """With barmode='relative', the y-range must cover stacked totals."""
+        # In the second frame, 3 techs of 100 each stack to 300 per period —
+        # beyond the first frame's extent, so the y-axis gets pinned and must
+        # use stacked sums, not individual segment values (max segment: 100).
+        values = np.full((2, 3, 2), 100.0)
+        values[:, :, 0] = 50.0
+        da = xr.DataArray(
+            values,
+            dims=["period", "tech", "case"],
+            name="heat",
+        )
+        combined = overlay(
+            xpx(da).bar(x="period", barmode="relative", animation_frame="case"),
+            xpx(da.isel(tech=0)).line(animation_frame="case"),
+        )
+
+        _lo, hi = combined.layout.yaxis.range
+        assert hi >= 300.0, f"Stacked bars reach 300 but range top is {hi}"
+
+    def test_stacked_bars_negative_values(self) -> None:
+        """Negative segments stack downward; the range must cover their sum."""
+        values = np.full((2, 3, 2), -40.0)
+        values[:, :, 0] = -10.0
+        da = xr.DataArray(
+            values,
+            dims=["period", "tech", "case"],
+            name="losses",
+        )
+        combined = overlay(
+            xpx(da).bar(x="period", barmode="relative", animation_frame="case"),
+            xpx(da.isel(tech=0)).line(animation_frame="case"),
+        )
+
+        lo, hi = combined.layout.yaxis.range
+        assert lo <= -120.0, f"Stacked bars reach -120 but range bottom is {lo}"
+        assert hi >= 0.0, "Bar axis should include the zero baseline"
+
+    def test_existing_explicit_range_respected(self) -> None:
+        """A user-set range on the base figure must not be overwritten."""
+        da = xr.DataArray(
+            np.array([[1.0, 100.0], [2.0, 200.0]]),
+            dims=["x", "frame"],
+            name="val",
+        )
+        fig1 = xpx(da).line(animation_frame="frame")
+        fig1.update_yaxes(range=[0, 42])
+        combined = overlay(fig1, xpx(da).scatter(animation_frame="frame"))
+
+        assert list(combined.layout.yaxis.range) == [0, 42]
+
+    def test_log_axis_not_pinned(self) -> None:
+        """Log axes use exponent coordinates; a data-value range would corrupt them."""
+        da = xr.DataArray(
+            np.array([[1.0, 100.0], [2.0, 200.0]]),
+            dims=["x", "frame"],
+            name="val",
+        )
+        fig1 = xpx(da).line(animation_frame="frame")
+        fig1.update_yaxes(type="log")
+        combined = overlay(fig1, xpx(da).scatter(animation_frame="frame"))
+
+        assert combined.layout.yaxis.range is None
+
+    def test_category_conversion_after_overlay_works(self) -> None:
+        """The reported bug: type='category' after overlay showed an empty plot."""
+        da = xr.DataArray(
+            np.random.rand(4, 3, 2),
+            dims=["period", "tech", "case"],
+            coords={"period": [2025, 2030, 2035, 2040]},
+            name="heat",
+        )
+        combined = overlay(
+            xpx(da).bar(x="period", barmode="relative", animation_frame="case"),
+            xpx(da.isel(tech=0)).line(animation_frame="case"),
+        ).update_xaxes(
+            type="category",
+            categoryorder="array",
+            categoryarray=[2025, 2030, 2035, 2040],
+        )
+
+        # No stale numeric range interpreted as category indices
+        assert combined.layout.xaxis.range is None
+
 
 class TestSubplotsBasic:
     """Basic tests for subplots function."""
