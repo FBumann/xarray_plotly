@@ -114,17 +114,6 @@ def _ensure_legend_visibility(
                         setattr(frame_trace, attr, src_val)
 
 
-# Barmodes in which bars at the same category position stack on top of each
-# other, so the axis extent is determined by the stacked sums, not by any
-# individual segment.
-_STACKED_BARMODES = ("stack", "relative")
-
-# Axis types whose range coordinates are not plain data values (log ranges
-# are exponents, category ranges are serial indices, ...).  Setting a range
-# computed from raw data on these would corrupt the view.
-_NON_LINEAR_AXIS_TYPES = ("log", "date", "category", "multicategory")
-
-
 def _numeric_values(vals: Any) -> np.ndarray | None:
     """Convert trace data to a 1-D float array, or None if not numeric.
 
@@ -170,26 +159,25 @@ def _collect_axis_extents(traces: Any, stacked: bool) -> dict[tuple[str, str], l
     )
 
     for trace in traces:
-        xref = getattr(trace, "xaxis", None) or "x"
-        yref = getattr(trace, "yaxis", None) or "y"
         is_bar = getattr(trace, "type", None) == "bar"
-        horizontal = (getattr(trace, "orientation", None) or "v") == "h"
+        value_letter = "x" if (getattr(trace, "orientation", None) or "v") == "h" else "y"
 
-        for letter, ref in (("x", xref), ("y", yref)):
+        for letter in ("x", "y"):
+            ref = getattr(trace, f"{letter}axis", None) or letter
             arr = _numeric_values(getattr(trace, letter, None))
             if arr is None:
                 continue
-            value_axis_of_stacked_bar = (
-                stacked and is_bar and letter == ("x" if horizontal else "y")
-            )
-            categories = getattr(trace, "y" if horizontal else "x", None)
-            if value_axis_of_stacked_bar and categories is not None:
-                sums = stack_sums[(letter, ref)]
-                cat_list = np.atleast_1d(np.asarray(categories, dtype=object)).tolist()
-                for cat, val in zip(cat_list, arr.tolist(), strict=False):
-                    if np.isfinite(val):
-                        sums[cat][0 if val >= 0 else 1] += val
-                continue
+            if is_bar and letter == value_letter:
+                # Bars grow from a zero baseline, so 0 is part of the extent
+                values[(letter, ref)].append(0.0)
+                categories = getattr(trace, "y" if letter == "x" else "x", None)
+                if stacked and categories is not None:
+                    sums = stack_sums[(letter, ref)]
+                    cat_list = np.atleast_1d(np.asarray(categories, dtype=object)).tolist()
+                    for cat, val in zip(cat_list, arr.tolist(), strict=False):
+                        if np.isfinite(val):
+                            sums[cat][0 if val >= 0 else 1] += val
+                    continue
             finite = arr[np.isfinite(arr)]
             if len(finite):
                 values[(letter, ref)].extend(finite.tolist())
@@ -228,50 +216,33 @@ def _fix_animation_axis_ranges(fig: go.Figure) -> None:
     if not fig.frames:
         return
 
-    stacked = fig.layout.barmode in _STACKED_BARMODES
-
+    stacked = fig.layout.barmode in ("stack", "relative")
     base_extents = _collect_axis_extents(fig.data, stacked)
     frame_extents = [_collect_axis_extents(frame.data, stacked) for frame in fig.frames]
 
-    # Value axes that carry bars are clamped to include zero, matching
-    # plotly's autorange behaviour for bar charts.
-    zero_clamped: set[tuple[str, str]] = set()
-    for trace in _iter_all_traces(fig):
-        if getattr(trace, "type", None) == "bar":
-            if (getattr(trace, "orientation", None) or "v") == "h":
-                zero_clamped.add(("x", getattr(trace, "xaxis", None) or "x"))
-            else:
-                zero_clamped.add(("y", getattr(trace, "yaxis", None) or "y"))
-
     all_keys = set(base_extents) | {key for fe in frame_extents for key in fe}
     for key in sorted(all_keys):
-        letter, ref = key
-        layout_prop = f"{letter}axis" if ref == letter else f"{letter}axis{ref[1:]}"
-        axis = fig.layout[layout_prop]
-        if axis.range is not None or axis.type in _NON_LINEAR_AXIS_TYPES:
+        _letter, ref = key
+        axis = fig.layout[_axis_layout_key(ref)]
+        # Respect explicit ranges; log/date/category range coordinates are
+        # not plain data values, so a computed range would corrupt the view.
+        if axis.range is not None or axis.type in ("log", "date", "category", "multicategory"):
             continue
 
-        base_vals = list(base_extents.get(key, ()))
-        global_vals = base_vals + [v for fe in frame_extents for v in fe.get(key, ())]
-        if not global_vals:
+        base_vals = base_extents.get(key, [])
+        all_vals = base_vals + [v for fe in frame_extents for v in fe.get(key, [])]
+        if not all_vals:
             continue
-        if key in zero_clamped:
-            base_vals = [*base_vals, 0.0]
-            global_vals = [*global_vals, 0.0]
-
-        global_lo, global_hi = min(global_vals), max(global_vals)
+        lo, hi = min(all_vals), max(all_vals)
 
         # Pin only when some frame exceeds the initial (fig.data) extent —
         # otherwise the autorange computed at first render stays valid for
         # the whole animation.
-        if base_vals:
-            tolerance = (global_hi - global_lo) * 1e-9 + 1e-12
-            base_lo, base_hi = min(base_vals), max(base_vals)
-            if global_lo >= base_lo - tolerance and global_hi <= base_hi + tolerance:
-                continue
+        if base_vals and min(base_vals) <= lo and max(base_vals) >= hi:
+            continue
 
-        pad = (global_hi - global_lo) * 0.05 or 1  # 5% padding
-        axis.range = [global_lo - pad, global_hi + pad]
+        pad = (hi - lo) * 0.05 or 1  # 5% padding
+        axis.range = [lo - pad, hi + pad]
 
 
 def _iter_all_traces(fig: go.Figure) -> Iterator[Any]:

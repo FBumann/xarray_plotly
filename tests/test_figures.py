@@ -803,14 +803,16 @@ class TestAnimationAxisRanges:
         Pinning it froze a numeric range that became a garbage category-index
         range if the user later switched the axis to type='category'.
         """
+        bar_values = np.full((4, 3, 2), 10.0)
+        bar_values[:, :, 1] = 50.0  # second frame exceeds the first
         da = xr.DataArray(
-            np.random.rand(4, 3, 2),
+            bar_values,
             dims=["period", "tech", "case"],
             coords={"period": [2025, 2030, 2035, 2040]},
             name="heat",
         )
         line_da = xr.DataArray(
-            np.random.rand(4, 2) * 200,
+            np.full((4, 2), 20.0),
             dims=["period", "case"],
             coords={"period": [2025, 2030, 2035, 2040]},
             name="demand",
