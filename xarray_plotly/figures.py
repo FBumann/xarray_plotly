@@ -6,11 +6,14 @@ from __future__ import annotations
 
 import copy
 import re
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    import numpy as np
+    import numpy.typing as npt
     import plotly.graph_objects as go
 
     from xarray_plotly.common import FacetTitlesMode
@@ -54,8 +57,6 @@ def _ensure_legend_visibility(
         source_figs: The original source figures, in trace order.
         trace_slices: Slices into ``combined.data`` for each source figure.
     """
-    from collections import defaultdict
-
     # --- Step 1: label unnamed traces from source y-axis titles -----------
     labels = [_get_yaxis_title(f) for f in source_figs]
 
@@ -114,88 +115,135 @@ def _ensure_legend_visibility(
                         setattr(frame_trace, attr, src_val)
 
 
+def _numeric_values(vals: Any) -> npt.NDArray[np.float64] | None:
+    """Convert trace data to a 1-D float array, or None if not numeric.
+
+    Datetime/timedelta and categorical (string) data return None — those
+    axes are left on autorange.
+    """
+    import numpy as np
+
+    if vals is None:
+        return None
+    arr = np.atleast_1d(np.asarray(vals))
+    if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
+        return None
+    try:
+        return arr.astype(float)
+    except (ValueError, TypeError):
+        return None  # Non-numeric (categorical)
+
+
+def _collect_axis_extents(traces: Any, stacked: bool) -> dict[tuple[str, str], list[float]]:
+    """Collect candidate axis values for one trace collection.
+
+    A "trace collection" is either ``fig.data`` or a single frame's data —
+    stacking only happens between bars shown at the same time, so each
+    collection must be aggregated independently.
+
+    Args:
+        traces: Iterable of traces (from ``fig.data`` or ``frame.data``).
+        stacked: Whether the layout barmode stacks bars. When True, bar
+            values on the value axis contribute per-category positive and
+            negative sums instead of raw segment values.
+
+    Returns:
+        Mapping of ``(axis_letter, axis_ref)`` (e.g. ``("y", "y2")``) to the
+        list of candidate values on that axis.
+    """
+    import numpy as np
+
+    values: dict[tuple[str, str], list[float]] = defaultdict(list)
+    # (letter, axis_ref) -> category value -> [positive_sum, negative_sum]
+    stack_sums: dict[tuple[str, str], dict[Any, list[float]]] = defaultdict(
+        lambda: defaultdict(lambda: [0.0, 0.0])
+    )
+
+    for trace in traces:
+        is_bar = getattr(trace, "type", None) == "bar"
+        value_letter = "x" if (getattr(trace, "orientation", None) or "v") == "h" else "y"
+
+        for letter in ("x", "y"):
+            ref = getattr(trace, f"{letter}axis", None) or letter
+            arr = _numeric_values(getattr(trace, letter, None))
+            if arr is None:
+                continue
+            if is_bar and letter == value_letter:
+                # Bars grow from a zero baseline, so 0 is part of the extent
+                values[(letter, ref)].append(0.0)
+                categories = getattr(trace, "y" if letter == "x" else "x", None)
+                if stacked and categories is not None:
+                    sums = stack_sums[(letter, ref)]
+                    cat_list = np.atleast_1d(np.asarray(categories, dtype=object)).tolist()
+                    for cat, val in zip(cat_list, arr.tolist(), strict=False):
+                        if np.isfinite(val):
+                            sums[cat][0 if val >= 0 else 1] += val
+                    continue
+            finite = arr[np.isfinite(arr)]
+            if len(finite):
+                values[(letter, ref)].extend(finite.tolist())
+
+    # Stacked sums are the candidate extremes for the value axis
+    for key, groups in stack_sums.items():
+        for pos_sum, neg_sum in groups.values():
+            values[key].extend((pos_sum, neg_sum))
+
+    return values
+
+
 def _fix_animation_axis_ranges(fig: go.Figure) -> None:
-    """Set axis ranges to encompass data across all animation frames.
+    """Pin axis ranges where animation frames exceed the initial view.
 
     Plotly.js computes autorange from ``fig.data`` only and does not
-    recalculate during animation.  When different frames have very different
-    data ranges (e.g. population of Brazil vs China), values can go off-screen.
-    This function computes the global min/max for each axis across all frames
-    and sets explicit ranges on the layout.
+    recalculate during animation.  When a later frame has data outside the
+    initial extent (e.g. population of Brazil vs China), values go
+    off-screen.  This function computes the global min/max for each axis
+    across all frames and sets an explicit range on the layout — but only
+    for axes where that is actually necessary.
 
-    Only numeric axes are handled; categorical/date axes are left to autorange.
+    Axes whose initial autorange already covers every frame are left on
+    live autorange, so plotly's native padding is preserved and downstream
+    changes (like switching the axis to ``type='category'``) keep working.
+    Axes with a pre-set explicit range, non-linear axes (log, category,
+    date), and non-numeric data are never touched.
+
+    For ``barmode='stack'`` / ``'relative'``, bar extents are computed from
+    per-category stacked sums rather than individual segment values, so
+    tall stacks are not clipped.
 
     Args:
         fig: A Plotly figure with animation frames (mutated in place).
     """
-    import numpy as np
-
     if not fig.frames:
         return
 
-    from collections import defaultdict
+    stacked = fig.layout.barmode in ("stack", "relative")
+    base_extents = _collect_axis_extents(fig.data, stacked)
+    frame_extents = [_collect_axis_extents(frame.data, stacked) for frame in fig.frames]
 
-    # Collect numeric y-values per axis across all traces (fig.data + frames)
-    y_by_axis: dict[str, list[float]] = defaultdict(list)
-    x_by_axis: dict[str, list[float]] = defaultdict(list)
-
-    # Track which axes have bar traces (for zero-baseline clamping)
-    y_has_vbar: set[str] = set()  # vertical bars → y-axis includes 0
-    x_has_hbar: set[str] = set()  # horizontal bars → x-axis includes 0
-
-    for trace in _iter_all_traces(fig):
-        yaxis = getattr(trace, "yaxis", None) or "y"
-        xaxis = getattr(trace, "xaxis", None) or "x"
-
-        # Track bar orientations
-        if getattr(trace, "type", None) == "bar":
-            orientation = getattr(trace, "orientation", None) or "v"
-            if orientation == "h":
-                x_has_hbar.add(xaxis)
-            else:
-                y_has_vbar.add(yaxis)
-
-        for data_attr, axis_ref, by_axis in [
-            ("y", yaxis, y_by_axis),
-            ("x", xaxis, x_by_axis),
-        ]:
-            vals = getattr(trace, data_attr, None)
-            if vals is None:
-                continue
-            arr = np.asarray(vals)
-            # Skip datetime/timedelta — leave those axes on autorange
-            if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
-                continue
-            try:
-                arr = arr.astype(float)
-                finite = arr[np.isfinite(arr)]
-                if len(finite):
-                    by_axis[axis_ref].extend(finite.tolist())
-            except (ValueError, TypeError):
-                pass  # Non-numeric (categorical) — skip
-
-    # Apply ranges to layout
-    for axis_ref, values in y_by_axis.items():
-        if not values:
+    all_keys = set(base_extents) | {key for fe in frame_extents for key in fe}
+    for key in sorted(all_keys):
+        _letter, ref = key
+        axis = fig.layout[_axis_layout_key(ref)]
+        # Respect explicit ranges; log/date/category range coordinates are
+        # not plain data values, so a computed range would corrupt the view.
+        if axis.range is not None or axis.type in ("log", "date", "category", "multicategory"):
             continue
-        lo, hi = min(values), max(values)
-        if axis_ref in y_has_vbar:
-            lo = min(lo, 0.0)
-            hi = max(hi, 0.0)
+
+        base_vals = base_extents.get(key, [])
+        all_vals = base_vals + [v for fe in frame_extents for v in fe.get(key, [])]
+        if not all_vals:
+            continue
+        lo, hi = min(all_vals), max(all_vals)
+
+        # Pin only when some frame exceeds the initial (fig.data) extent —
+        # otherwise the autorange computed at first render stays valid for
+        # the whole animation.
+        if base_vals and min(base_vals) <= lo and max(base_vals) >= hi:
+            continue
+
         pad = (hi - lo) * 0.05 or 1  # 5% padding
-        layout_prop = "yaxis" if axis_ref == "y" else f"yaxis{axis_ref[1:]}"
-        fig.layout[layout_prop].range = [lo - pad, hi + pad]
-
-    for axis_ref, values in x_by_axis.items():
-        if not values:
-            continue
-        lo, hi = min(values), max(values)
-        if axis_ref in x_has_hbar:
-            lo = min(lo, 0.0)
-            hi = max(hi, 0.0)
-        pad = (hi - lo) * 0.05 or 1
-        layout_prop = "xaxis" if axis_ref == "x" else f"xaxis{axis_ref[1:]}"
-        fig.layout[layout_prop].range = [lo - pad, hi + pad]
+        axis.range = [lo - pad, hi + pad]
 
 
 def _iter_all_traces(fig: go.Figure) -> Iterator[Any]:
