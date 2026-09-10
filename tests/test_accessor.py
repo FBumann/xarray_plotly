@@ -498,11 +498,117 @@ class TestImshowFaceting:
     ) -> None:
         """Test that auto-assignment skips facet_row on old plotly (4th dim animates)."""
         monkeypatch.setattr(plotting, "_imshow_supports_facet_row", lambda: False)
-        fig = self.da_4d.plotly.imshow()
+        with pytest.warns(UserWarning, match=r"'year' is animated instead of faceted"):
+            fig = self.da_4d.plotly.imshow()
         # year (4th dim) falls through to animation_frame instead of facet_row
         assert len(fig.frames) == 3
         # only the facet_col (scenario) produces subplots
         assert len(fig.data) == 2
+
+    def test_imshow_auto_facet_row_warning_mentions_plotly_version(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that the fallback warning points at the plotly requirement."""
+        monkeypatch.setattr(plotting, "_imshow_supports_facet_row", lambda: False)
+        with pytest.warns(UserWarning, match=r"facet_row for imshow requires plotly>=6\.7\.0"):
+            self.da_4d.plotly.imshow()
+
+    def test_imshow_no_animation_slot_left_on_old_plotly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test the 5D case on old plotly: no slot left to absorb facet_row."""
+        monkeypatch.setattr(plotting, "_imshow_supports_facet_row", lambda: False)
+        da = xr.DataArray(
+            np.random.rand(2, 2, 2, 2, 2),
+            dims=["lat", "lon", "scenario", "year", "time"],
+        )
+        with pytest.raises(ValueError, match=r"already fills the animation slot"):
+            da.plotly.imshow()
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_col_wrap_ignored_with_facet_row(self) -> None:
+        """Test that facet_col_wrap is dropped so facet_row titles survive."""
+        with pytest.warns(UserWarning, match=r"facet_col_wrap is ignored"):
+            fig = self.da_4d.plotly.imshow(facet_col_wrap=2)
+        facet_titles = {a.text for a in fig.layout.annotations if "=" in (a.text or "")}
+        assert facet_titles == {
+            "scenario=low",
+            "scenario=high",
+            "year=2020",
+            "year=2021",
+            "year=2022",
+        }
+
+    def test_imshow_facet_col_wrap_kept_without_facet_row(self) -> None:
+        """Test that facet_col_wrap still applies when there is no facet_row."""
+        fig = self.da_3d.plotly.imshow(facet_col_wrap=2)
+        assert len(fig.data) == 3
+        # Wrapping at 2 columns stacks the 3 facets over two rows of subplots.
+        domains = {tuple(fig.layout[k].domain) for k in fig.layout if k.startswith("yaxis")}
+        assert len(domains) == 2
+
+    def test_imshow_duplicate_dim_across_slots(self) -> None:
+        """Test a clear error when one dimension is asked to fill two slots.
+
+        px.imshow otherwise dies with "IndexError: pop index out of range".
+        """
+        with pytest.raises(ValueError, match=r"'scenario' is assigned to both"):
+            self.da_3d.plotly.imshow(y="lat", x="lon", facet_col="scenario", facet_row="scenario")
+
+    def test_imshow_duplicate_dim_facet_row_and_animation(self) -> None:
+        """Test the duplicate check across facet_row and animation_frame."""
+        with pytest.raises(ValueError, match=r"'year' is assigned to both"):
+            self.da_4d.plotly.imshow(
+                y="lat", x="lon", facet_col="scenario", facet_row="year", animation_frame="year"
+            )
+
+    def test_imshow_no_dimension_left_for_x(self) -> None:
+        """Test a clear error when facet/animation slots eat the heatmap axes.
+
+        px.imshow otherwise dies with "IndexError: list index out of range".
+        """
+        with pytest.raises(ValueError, match=r"needs a dimension for both 'y' and 'x'"):
+            self.da_4d.plotly.imshow(facet_col="lat", facet_row="lon", animation_frame="scenario")
+
+    def test_imshow_2d_with_both_facets_leaves_no_axes(self) -> None:
+        """Test the error when a 2D array puts both of its dims into facets."""
+        da = xr.DataArray(
+            np.random.rand(2, 3), dims=["a", "b"], coords={"a": [0, 1], "b": [0, 1, 2]}
+        )
+        with pytest.raises(ValueError, match=r"needs a dimension for both 'y' and 'x'"):
+            da.plotly.imshow(facet_col="a", facet_row="b")
+
+    @requires_imshow_facet_row
+    def test_imshow_explicit_x_y_facet_col_facet_row_4d(self) -> None:
+        """Test that naming all four slots on a 4D array builds the full grid."""
+        fig = self.da_4d.plotly.imshow(x="lon", y="lat", facet_col="scenario", facet_row="year")
+        assert len(fig.data) == 6
+        facet_titles = {a.text for a in fig.layout.annotations if "=" in (a.text or "")}
+        assert facet_titles == {
+            "scenario=low",
+            "scenario=high",
+            "year=2020",
+            "year=2021",
+            "year=2022",
+        }
+
+    @requires_imshow_facet_row
+    def test_imshow_facet_grid_places_data_in_right_subplot(self) -> None:
+        """Test that each (facet_col, facet_row) pair lands in its own subplot."""
+        values = np.zeros((2, 3, 4, 5))
+        for col in range(2):
+            for row in range(3):
+                values[col, row] = col * 10 + row
+        da = xr.DataArray(
+            values,
+            dims=["scenario", "year", "lat", "lon"],
+            coords={"scenario": ["low", "high"], "year": [2020, 2021, 2022]},
+        )
+        fig = da.plotly.imshow(x="lon", y="lat", facet_col="scenario", facet_row="year")
+        assert len(fig.data) == 6
+        # Every subplot holds exactly one constant value, and all six differ.
+        constants = {float(np.unique(trace.z)[0]) for trace in fig.data}
+        assert constants == {0.0, 1.0, 2.0, 10.0, 11.0, 12.0}
 
 
 class TestColorsParameter:

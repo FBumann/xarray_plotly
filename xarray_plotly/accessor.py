@@ -360,8 +360,10 @@ class DataArrayPlotlyAccessor:
             y: Dimension for y-axis (rows). Default: first dimension.
             facet_col: Dimension for subplot columns. Default: third dimension.
             facet_row: Dimension for subplot rows. Default: fourth dimension.
-                Requires plotly>=6.7.0; on older versions this slot is skipped
-                during auto-assignment.
+                Requires plotly>=6.7.0; on older versions an auto-assigned
+                dimension animates instead (with a warning) and an explicitly
+                named one raises `ValueError`. `facet_col_wrap` is ignored
+                when `facet_row` is set.
             animation_frame: Dimension for animation. Default: fifth dimension.
             robust: If True, use 2nd/98th percentiles for color bounds (handles outliers).
             colors: Color scale name (e.g., "Viridis", "RdBu"). See module docs.

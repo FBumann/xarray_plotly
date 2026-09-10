@@ -31,6 +31,8 @@ from xarray_plotly.figures import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     import plotly.graph_objects as go
     from xarray import DataArray
 
@@ -669,6 +671,88 @@ def _imshow_supports_facet_row() -> bool:
     return "facet_row" in inspect.signature(px.imshow).parameters
 
 
+_IMSHOW_SLOTS = ("y", "x", "facet_col", "facet_row", "animation_frame")
+
+
+def _validate_imshow_slots(slots: dict[str, Hashable]) -> None:
+    """Check that imshow's slots form a usable heatmap before handing them to plotly.
+
+    Every imshow slot is a separate axis of the data, so each needs its own
+    dimension and both heatmap axes must be filled.  ``px.imshow`` does not
+    check either, and fails deep inside its own slicing with ``IndexError:
+    pop index out of range`` (a dimension used twice) or ``IndexError: list
+    index out of range`` (nothing left for y/x).
+
+    Args:
+        slots: Slot assignment from :func:`assign_slots`.
+
+    Raises:
+        ValueError: If a dimension fills two slots, or y/x is left empty.
+    """
+    seen: dict[Hashable, str] = {}
+    for slot in _IMSHOW_SLOTS:
+        dim = slots.get(slot)
+        if dim is None:
+            continue
+        if dim in seen:
+            msg = (
+                f"Dimension {dim!r} is assigned to both {seen[dim]!r} and {slot!r}. "
+                f"Each imshow slot needs its own dimension."
+            )
+            raise ValueError(msg)
+        seen[dim] = slot
+
+    missing = [slot for slot in ("y", "x") if slots.get(slot) is None]
+    if missing:
+        taken = {slot: dim for dim, slot in seen.items()}
+        msg = (
+            f"imshow needs a dimension for both 'y' and 'x', but {missing} "
+            f"came up empty; the other slots took {taken}. Free one with "
+            f"facet_col=None, facet_row=None or animation_frame=None, or reduce "
+            f"a dimension with .sel(), .isel() or .mean() before plotting."
+        )
+        raise ValueError(msg)
+
+
+def _handle_unsupported_facet_row(slots: dict[str, Hashable], *, explicit: bool) -> None:
+    """Resolve an imshow ``facet_row`` slot that the installed plotly cannot draw.
+
+    ``px.imshow`` gained ``facet_row`` in plotly 6.7.0.  On older versions an
+    explicit request is an error, while an auto-assigned dimension falls back
+    to animating (with a warning, so the missing subplot rows are not a
+    silent surprise).  If the animation slot is already taken there is nowhere
+    to fall back to, so that case raises as well.
+
+    Args:
+        slots: Slot assignment from :func:`assign_slots` (mutated in place).
+        explicit: Whether the user named the ``facet_row`` dimension.
+    """
+    import plotly
+
+    dim = slots["facet_row"]
+    msg = f"facet_row for imshow requires plotly>=6.7.0 (installed: {plotly.__version__})."
+
+    if explicit:
+        raise ValueError(msg)
+
+    if slots.get("animation_frame") is not None:
+        msg = (
+            f"{msg} Dimension {dim!r} cannot be faceted across subplot rows, and "
+            f"{slots['animation_frame']!r} already fills the animation slot. "
+            f"Upgrade plotly, or reduce a dimension with .sel(), .isel() or .mean()."
+        )
+        raise ValueError(msg)
+
+    warnings.warn(
+        f"{msg} Dimension {dim!r} is animated instead of faceted across "
+        f"subplot rows; upgrade plotly to facet it.",
+        UserWarning,
+        stacklevel=4,
+    )
+    slots["animation_frame"] = dim
+    slots["facet_row"] = None
+
+
 def imshow(
     darray: DataArray,
     *,
@@ -709,10 +793,11 @@ def imshow(
         Dimension for subplot columns. Default: third dimension.
     facet_row
         Dimension for subplot rows. Default: fourth dimension.
-        Requires plotly>=6.7.0; on older versions this slot is skipped
-        during auto-assignment (the fourth dimension animates instead).
-        Note: ``facet_col_wrap`` is ignored by plotly when ``facet_row``
-        is set.
+        Requires plotly>=6.7.0; on older versions an auto-assigned
+        dimension animates instead and a ``UserWarning`` is emitted, while
+        an explicitly named one raises ``ValueError``.
+        Note: ``facet_col_wrap`` is ignored (with a warning) when
+        ``facet_row`` is set, matching the other plot types.
     animation_frame
         Dimension for animation. Default: fifth dimension.
     robust
@@ -736,11 +821,6 @@ def imshow(
     """
     px_kwargs = resolve_colors(colors, px_kwargs)
 
-    # On plotly < 6.7.0, px.imshow has no facet_row: skip auto-assignment so
-    # dimensions fall through to animation_frame instead.
-    if facet_row is auto and not _imshow_supports_facet_row():
-        facet_row = None
-
     slots = assign_slots(
         list(darray.dims),
         "imshow",
@@ -751,14 +831,24 @@ def imshow(
         animation_frame=animation_frame,
     )
 
+    _validate_imshow_slots(slots)
+
+    if slots.get("facet_row") is not None and not _imshow_supports_facet_row():
+        _handle_unsupported_facet_row(slots, explicit=facet_row is not auto)
+
     facet_row_kwargs: dict[str, Any] = {}
     if slots.get("facet_row") is not None:
-        if not _imshow_supports_facet_row():
-            import plotly
-
-            msg = f"facet_row for imshow requires plotly>=6.7.0 (installed: {plotly.__version__})."
-            raise ValueError(msg)
         facet_row_kwargs["facet_row"] = slots["facet_row"]
+        # px.imshow honours facet_col_wrap even when facet_row is set, which
+        # builds the grid but silently drops the facet_row titles.  Every other
+        # px function ignores the wrap in that case; match them.
+        if px_kwargs.pop("facet_col_wrap", None) is not None:
+            warnings.warn(
+                "facet_col_wrap is ignored when facet_row is set; "
+                "px.imshow would otherwise drop the facet_row subplot titles.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     # Transpose to: y (rows), x (cols), facet_col, facet_row, animation_frame
     transpose_order = [

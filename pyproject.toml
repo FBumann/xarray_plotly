@@ -92,7 +92,9 @@ ignore = [
 known-first-party = ["xarray_plotly"]
 
 [tool.mypy]
-python_version = "3.10"
+# No python_version pin: mypy then targets the interpreter it runs under, so
+# each CI matrix entry checks its own version against the numpy stubs resolved
+# for it.  Pinning 3.10 made mypy reject numpy's `type` statements outright.
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
