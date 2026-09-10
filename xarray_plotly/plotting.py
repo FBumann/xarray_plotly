@@ -671,6 +671,49 @@ def _imshow_supports_facet_row() -> bool:
     return "facet_row" in inspect.signature(px.imshow).parameters
 
 
+_IMSHOW_SLOTS = ("y", "x", "facet_col", "facet_row", "animation_frame")
+
+
+def _validate_imshow_slots(slots: dict[str, Hashable]) -> None:
+    """Check that imshow's slots form a usable heatmap before handing them to plotly.
+
+    Every imshow slot is a separate axis of the data, so each needs its own
+    dimension and both heatmap axes must be filled.  ``px.imshow`` does not
+    check either, and fails deep inside its own slicing with ``IndexError:
+    pop index out of range`` (a dimension used twice) or ``IndexError: list
+    index out of range`` (nothing left for y/x).
+
+    Args:
+        slots: Slot assignment from :func:`assign_slots`.
+
+    Raises:
+        ValueError: If a dimension fills two slots, or y/x is left empty.
+    """
+    seen: dict[Hashable, str] = {}
+    for slot in _IMSHOW_SLOTS:
+        dim = slots.get(slot)
+        if dim is None:
+            continue
+        if dim in seen:
+            msg = (
+                f"Dimension {dim!r} is assigned to both {seen[dim]!r} and {slot!r}. "
+                f"Each imshow slot needs its own dimension."
+            )
+            raise ValueError(msg)
+        seen[dim] = slot
+
+    missing = [slot for slot in ("y", "x") if slots.get(slot) is None]
+    if missing:
+        taken = {slot: dim for dim, slot in seen.items()}
+        msg = (
+            f"imshow needs a dimension for both 'y' and 'x', but {missing} "
+            f"came up empty; the other slots took {taken}. Free one with "
+            f"facet_col=None, facet_row=None or animation_frame=None, or reduce "
+            f"a dimension with .sel(), .isel() or .mean() before plotting."
+        )
+        raise ValueError(msg)
+
+
 def _handle_unsupported_facet_row(slots: dict[str, Hashable], *, explicit: bool) -> None:
     """Resolve an imshow ``facet_row`` slot that the installed plotly cannot draw.
 
@@ -787,6 +830,8 @@ def imshow(
         facet_row=facet_row,
         animation_frame=animation_frame,
     )
+
+    _validate_imshow_slots(slots)
 
     if slots.get("facet_row") is not None and not _imshow_supports_facet_row():
         _handle_unsupported_facet_row(slots, explicit=facet_row is not auto)

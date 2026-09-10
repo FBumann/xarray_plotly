@@ -547,6 +547,51 @@ class TestImshowFaceting:
         domains = {tuple(fig.layout[k].domain) for k in fig.layout if k.startswith("yaxis")}
         assert len(domains) == 2
 
+    def test_imshow_duplicate_dim_across_slots(self) -> None:
+        """Test a clear error when one dimension is asked to fill two slots.
+
+        px.imshow otherwise dies with "IndexError: pop index out of range".
+        """
+        with pytest.raises(ValueError, match=r"'scenario' is assigned to both"):
+            self.da_3d.plotly.imshow(y="lat", x="lon", facet_col="scenario", facet_row="scenario")
+
+    def test_imshow_duplicate_dim_facet_row_and_animation(self) -> None:
+        """Test the duplicate check across facet_row and animation_frame."""
+        with pytest.raises(ValueError, match=r"'year' is assigned to both"):
+            self.da_4d.plotly.imshow(
+                y="lat", x="lon", facet_col="scenario", facet_row="year", animation_frame="year"
+            )
+
+    def test_imshow_no_dimension_left_for_x(self) -> None:
+        """Test a clear error when facet/animation slots eat the heatmap axes.
+
+        px.imshow otherwise dies with "IndexError: list index out of range".
+        """
+        with pytest.raises(ValueError, match=r"needs a dimension for both 'y' and 'x'"):
+            self.da_4d.plotly.imshow(facet_col="lat", facet_row="lon", animation_frame="scenario")
+
+    def test_imshow_2d_with_both_facets_leaves_no_axes(self) -> None:
+        """Test the error when a 2D array puts both of its dims into facets."""
+        da = xr.DataArray(
+            np.random.rand(2, 3), dims=["a", "b"], coords={"a": [0, 1], "b": [0, 1, 2]}
+        )
+        with pytest.raises(ValueError, match=r"needs a dimension for both 'y' and 'x'"):
+            da.plotly.imshow(facet_col="a", facet_row="b")
+
+    @requires_imshow_facet_row
+    def test_imshow_explicit_x_y_facet_col_facet_row_4d(self) -> None:
+        """Test that naming all four slots on a 4D array builds the full grid."""
+        fig = self.da_4d.plotly.imshow(x="lon", y="lat", facet_col="scenario", facet_row="year")
+        assert len(fig.data) == 6
+        facet_titles = {a.text for a in fig.layout.annotations if "=" in (a.text or "")}
+        assert facet_titles == {
+            "scenario=low",
+            "scenario=high",
+            "year=2020",
+            "year=2021",
+            "year=2022",
+        }
+
     @requires_imshow_facet_row
     def test_imshow_facet_grid_places_data_in_right_subplot(self) -> None:
         """Test that each (facet_col, facet_row) pair lands in its own subplot."""
